@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -278,6 +278,15 @@ function ConsentGate({ onAccept }: { onAccept: () => void }) {
   const [checked, setChecked] = useState(false);
   const [declined, setDeclined] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const termsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    window.setTimeout(() => {
+      termsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      termsRef.current?.scrollTo({ top: 0 });
+    }, 80);
+  }, [expanded]);
 
   if (declined) {
     return (
@@ -316,7 +325,7 @@ function ConsentGate({ onAccept }: { onAccept: () => void }) {
           {expanded ? "Hide full terms" : "View full terms"}
         </button>
 
-        <div className={`terms-box ${expanded ? "expanded" : ""}`}>
+        <div ref={termsRef} className={`terms-box ${expanded ? "expanded" : ""}`}>
           <h3>Consent and prototype terms</h3>
           <p>
             Thryve is a prototype/demo wellness app provided for informational and personal tracking purposes only. It is not a medical, nutritional, legal, fitness, or other professional service.
