@@ -14,6 +14,7 @@ interface SessionRecord {
   token: string;
   userId: string;
   createdAt: string;
+  expiresAt: string;
 }
 
 interface DatabaseShape {
@@ -31,6 +32,7 @@ interface SocialReaction {
 }
 
 const databasePath = join(process.cwd(), "server", "data", "thryve.json");
+const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
 
 const defaultFeedPosts: FeedPost[] = [
   {
@@ -73,6 +75,18 @@ export async function getDatabase() {
     database.users.forEach((user) => {
       user.followingUserIds ??= [];
     });
+    const sessionsBeforeCleanup = database.sessions?.length ?? 0;
+    let addedExpiryToLegacySession = false;
+    database.sessions = (database.sessions ?? []).filter((session) => {
+      if (!session.expiresAt) {
+        session.expiresAt = new Date(new Date(session.createdAt).getTime() + sessionDurationMs).toISOString();
+        addedExpiryToLegacySession = true;
+      }
+      return new Date(session.expiresAt).getTime() > Date.now();
+    });
+    if (addedExpiryToLegacySession || database.sessions.length !== sessionsBeforeCleanup) {
+      await saveDatabase();
+    }
   } catch {
     database = { users: [], sessions: [], feedPosts: defaultFeedPosts, socialReactions: [], socialComments: [] };
     await saveDatabase();
@@ -120,10 +134,12 @@ export async function createUser(name: string, email: string, passwordHash: stri
 
 export async function createSession(userId: string) {
   const db = await getDatabase();
+  const createdAt = new Date();
   const session = {
     token: crypto.randomUUID(),
     userId,
-    createdAt: new Date().toISOString()
+    createdAt: createdAt.toISOString(),
+    expiresAt: new Date(createdAt.getTime() + sessionDurationMs).toISOString()
   };
 
   db.sessions.push(session);
@@ -138,6 +154,12 @@ export async function findUserByToken(token?: string) {
 
   const db = await getDatabase();
   const session = db.sessions.find((item) => item.token === token);
+  if (session && new Date(session.expiresAt).getTime() <= Date.now()) {
+    db.sessions = db.sessions.filter((item) => item.token !== token);
+    await saveDatabase();
+    return undefined;
+  }
+
   return session ? db.users.find((user) => user.id === session.userId) : undefined;
 }
 

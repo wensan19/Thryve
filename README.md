@@ -10,7 +10,8 @@ Thryve is a website-first food tracking prototype designed to prove the core pro
 
 ## What Works Now
 
-- Signup and login with token-based sessions.
+- Signup and login with bcrypt password hashing, stronger validation, and expiring token sessions.
+- The Home page includes the Thryve logo in the top-left brand area.
 - Versioned consent / terms gate before users can enter the app.
 - Logged-in state persists in the browser with `localStorage`.
 - Meals, exercises, and profile data are protected per user.
@@ -146,7 +147,13 @@ Current limitation: local JSON storage is fine for prototyping, but production s
 
 ## Auth And Persistence
 
-This is still a development-ready implementation, not production security. Passwords are hashed with a simple SHA-256 helper and sessions are stored in the local JSON file. For production, replace this with a real database, salted password hashing such as Argon2 or bcrypt, HTTPS-only cookies or hardened bearer tokens, and session expiry.
+Passwords are hashed with bcrypt before being saved, and login uses bcrypt comparison. Signup validates display name, email format, and password strength. Login returns a generic invalid-credentials message so it does not reveal whether the email or password was wrong.
+
+Auth sessions are token-based and expire after 7 days. Expired sessions are removed from the local store and require the user to log in again. The frontend clears an expired token when the backend returns an auth failure.
+
+Migration note: earlier prototype users saved with the old SHA-256 password helper are not compatible with the bcrypt-only login path. Recreate those prototype accounts or reset their passwords in a future admin flow.
+
+This is more realistic than the first prototype, but still uses local JSON storage. For production, replace it with a real database, HTTPS-only secure cookies or hardened bearer-token handling, rate limiting, email verification, and a proper password reset flow.
 
 The storage code lives in `server/src/data/store.ts`. The route layer already reads and writes through that store, which keeps the future database migration contained.
 

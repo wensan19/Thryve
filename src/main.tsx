@@ -378,7 +378,7 @@ function LoginScreen({
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [name, setName] = useState("example");
   const [email, setEmail] = useState("example@example.com");
-  const [password, setPassword] = useState("thryve1");
+  const [password, setPassword] = useState("example1");
   const [status, setStatus] = useState<AsyncState>("idle");
   const [message, setMessage] = useState("Use this test account or create your own.");
 
@@ -440,6 +440,9 @@ function HomeScreen({
 
   return (
     <section className="screen">
+      <div className="home-brand-row">
+        <img className="home-logo" src="/logo.jpeg" alt="Thryve logo" />
+      </div>
       <Header title={`Hi, ${profile.name}`} subtitle="A steady day beats a perfect one." />
       <div className="hero-card">
         <div>
