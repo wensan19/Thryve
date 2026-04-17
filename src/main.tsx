@@ -367,8 +367,8 @@ function LoginScreen({
   onSubmit: (mode: "login" | "signup", name: string, email: string, password: string) => Promise<void>;
 }) {
   const [mode, setMode] = useState<"login" | "signup">("signup");
-  const [name, setName] = useState("Maya");
-  const [email, setEmail] = useState("maya@example.com");
+  const [name, setName] = useState("example");
+  const [email, setEmail] = useState("example@example.com");
   const [password, setPassword] = useState("thryve1");
   const [status, setStatus] = useState<AsyncState>("idle");
   const [message, setMessage] = useState("Use this test account or create your own.");
