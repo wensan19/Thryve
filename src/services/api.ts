@@ -19,7 +19,7 @@ export class ApiClient {
   private token = localStorage.getItem("thryve_token") ?? "";
 
   hasToken() {
-    return Boolean(this.getStoredToken());
+    return Boolean(this.getUsableStoredToken());
   }
 
   setToken(token: string) {
@@ -187,7 +187,12 @@ export class ApiClient {
       headers.set("Content-Type", "application/json");
     }
 
-    const token = this.getStoredToken();
+    const token = this.getUsableStoredToken();
+    if (includeAuth && !token) {
+      window.dispatchEvent(new CustomEvent(authExpiredEvent));
+      throw new Error("Please log in again.");
+    }
+
     if (includeAuth && token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
@@ -223,6 +228,20 @@ export class ApiClient {
     }
     return this.token;
   }
+
+  private getUsableStoredToken() {
+    const token = this.getStoredToken();
+    if (!token) {
+      return "";
+    }
+
+    if (!isCurrentSignedToken(token) || isExpiredSignedToken(token)) {
+      this.clearToken();
+      return "";
+    }
+
+    return token;
+  }
 }
 
 function getApiBaseUrl() {
@@ -237,4 +256,23 @@ function getApiBaseUrl() {
   }
 
   return "";
+}
+
+function isCurrentSignedToken(token: string) {
+  return token.startsWith("thryve.v1.") && token.split(".").length === 4;
+}
+
+function isExpiredSignedToken(token: string) {
+  try {
+    const payload = token.split(".")[2];
+    const parsed = JSON.parse(atob(toBase64(payload))) as { exp?: number };
+    return !parsed.exp || parsed.exp <= Math.floor(Date.now() / 1000);
+  } catch {
+    return true;
+  }
+}
+
+function toBase64(value: string) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  return normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
 }

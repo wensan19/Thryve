@@ -170,6 +170,8 @@ Auth sessions are token-based and expire after 7 days. Expired sessions are remo
 
 New sessions use signed expiring bearer tokens, so token validation no longer depends only on the in-memory/local JSON session list. Set `SESSION_SECRET` in production so signed tokens remain valid across backend restarts and redeploys. If Render storage is reset and user records are lost, users still need to sign up again because the prototype does not yet use a production database.
 
+The frontend checks the stored token shape and expiry before calling `/api/auth/me`. Clearly stale prototype tokens are cleared locally and treated as signed out, which avoids unnecessary startup auth noise. A backend `401` can still happen if a signed token was issued with a different `SESSION_SECRET` or its user record no longer exists; in that case the app clears the token and asks the user to log in again.
+
 Migration note: earlier prototype users saved with the old SHA-256 password helper can log in once with the correct password and are migrated to bcrypt immediately. If Render storage was reset and the user record no longer exists, recreate the account or move to a production database.
 
 This is more realistic than the first prototype, but still uses local JSON storage. For production, replace it with a real database, HTTPS-only secure cookies or hardened bearer-token handling, rate limiting, email verification, and a proper password reset flow.
