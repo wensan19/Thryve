@@ -269,13 +269,13 @@ h3 {
 
 .home-brand-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
   margin: 2px 0 14px;
 }
 
 .home-logo {
-  width: 42px;
-  height: 42px;
+  width: 58px;
+  height: 58px;
   border-radius: 8px;
   object-fit: cover;
   border: 1px solid rgba(255, 255, 255, 0.62);
