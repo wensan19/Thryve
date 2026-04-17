@@ -52,6 +52,7 @@ const initialProfile: ProfileSummary = {
   goal: "Feel lighter and stronger",
   heightCm: 166,
   weightKg: 58,
+  targetWeightKg: 56,
   calorieTarget: 1850
 };
 
@@ -1007,6 +1008,8 @@ function ProfileScreen({
   const [message, setMessage] = useState("");
   const [photoPreview, setPhotoPreview] = useState(profile.photoUrl ?? "");
   const bmi = draft.weightKg / Math.pow(draft.heightCm / 100, 2);
+  const bmiInfo = getBmiInfo(bmi);
+  const caloriePlan = getCaloriePlan(draft);
 
   useEffect(() => {
     setDraft(profile);
@@ -1057,10 +1060,33 @@ function ProfileScreen({
         <Avatar name={draft.name} photoUrl={photoPreview} />
         <div><h2>{draft.name}</h2><p>{draft.email}</p></div>
       </div>
-      <div className="metric-grid">
-        <Metric label="BMI" value={bmi.toFixed(1)} />
-        <Metric label="Target" value={`${draft.calorieTarget}`} />
-        <Metric label="Left" value={`${Math.max(totals.remaining, 0)}`} />
+      <div className="bmi-panel">
+        <div className="section-heading compact-heading">
+          <div>
+            <p className="eyebrow">BMI</p>
+            <h3>{bmi.toFixed(1)} · {bmiInfo.label}</h3>
+          </div>
+          <span className={`bmi-chip ${bmiInfo.key}`}>{bmiInfo.label}</span>
+        </div>
+        <div className="bmi-track">
+          <span className="underweight"></span>
+          <span className="healthy"></span>
+          <span className="overweight"></span>
+          <span className="obese"></span>
+          <i style={{ left: `${bmiPosition(bmi)}%` }}></i>
+        </div>
+        <div className="bmi-scale"><span>16</span><span>18.5</span><span>25</span><span>30</span><span>40</span></div>
+      </div>
+      <div className="goal-calorie-card">
+        <p className="eyebrow">Weight Goal</p>
+        <h3>{caloriePlan.direction}</h3>
+        <p>{draft.targetWeightKg ?? draft.weightKg} kg target · {caloriePlan.summary}</p>
+        <div className="metric-grid compact-metrics">
+          <Metric label="Maintain" value={`${caloriePlan.maintenance}`} />
+          <Metric label="Goal/day" value={`${caloriePlan.goalCalories}`} />
+          <Metric label="Left" value={`${Math.max(totals.remaining, 0)}`} />
+        </div>
+        <p className="tiny">Prototype estimate for gradual progress, not medical advice.</p>
       </div>
       <div className="simple-form">
         <div className="avatar-edit">
@@ -1078,8 +1104,9 @@ function ProfileScreen({
         </div>
         <div className="form-grid">
           <FormField label="Weight" value={draft.weightKg} onChange={(value) => update("weightKg", Number(value))} type="number" />
-          <FormField label="Calories" value={draft.calorieTarget} onChange={(value) => update("calorieTarget", Number(value))} type="number" />
+          <FormField label="Target weight" value={draft.targetWeightKg ?? draft.weightKg} onChange={(value) => update("targetWeightKg", Number(value))} type="number" />
         </div>
+        <FormField label="Daily calorie target" value={draft.calorieTarget} onChange={(value) => update("calorieTarget", Number(value))} type="number" />
         <button className="primary-button" disabled={status === "loading"} onClick={save}>Save profile</button>
         <button className="secondary-button full" onClick={onLogout}>Log out</button>
         {message && <StatusLine status={status} text={message} />}
@@ -1379,6 +1406,31 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 
 function StatusLine({ status, text }: { status: AsyncState; text: string }) {
   return <p className={`status-line ${status}`}>{text}</p>;
+}
+
+function getBmiInfo(bmi: number) {
+  if (bmi < 18.5) return { key: "underweight", label: "Underweight" };
+  if (bmi < 25) return { key: "healthy", label: "Healthy" };
+  if (bmi < 30) return { key: "overweight", label: "Overweight" };
+  return { key: "obese", label: "Obese" };
+}
+
+function bmiPosition(bmi: number) {
+  const min = 16;
+  const max = 40;
+  return Math.max(0, Math.min(100, ((bmi - min) / (max - min)) * 100));
+}
+
+function getCaloriePlan(profile: ProfileSummary) {
+  const targetWeight = profile.targetWeightKg ?? profile.weightKg;
+  const bmr = (10 * profile.weightKg) + (6.25 * profile.heightCm) - (5 * profile.age) - 80;
+  const maintenance = Math.max(1200, Math.round(bmr * 1.35));
+  const difference = targetWeight - profile.weightKg;
+  const direction = Math.abs(difference) < 1 ? "Maintain weight" : difference < 0 ? "Lose weight gently" : "Gain weight gently";
+  const adjustment = Math.abs(difference) < 1 ? 0 : difference < 0 ? -300 : 250;
+  const goalCalories = Math.max(1200, Math.round(maintenance + adjustment));
+  const summary = adjustment < 0 ? "gentle deficit" : adjustment > 0 ? "gentle surplus" : "steady maintenance";
+  return { maintenance, goalCalories, direction, summary };
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

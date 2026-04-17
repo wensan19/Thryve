@@ -76,6 +76,7 @@ export async function getDatabase() {
     database.socialComments ??= [];
     database.users.forEach((user) => {
       user.followingUserIds ??= [];
+      user.profile.targetWeightKg ??= user.profile.weightKg;
     });
     const sessionsBeforeCleanup = database.sessions?.length ?? 0;
     let addedExpiryToLegacySession = false;
@@ -477,6 +478,7 @@ function createDefaultProfile(name: string, email: string): ProfileSummary {
     goal: "Feel lighter and stronger",
     heightCm: 166,
     weightKg: 58,
+    targetWeightKg: 56,
     calorieTarget: 1850
   };
 }

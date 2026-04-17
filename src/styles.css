@@ -807,6 +807,87 @@ h3 {
   margin-bottom: 2px;
 }
 
+.bmi-panel,
+.goal-calorie-card {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--pearl);
+  box-shadow: var(--bubble-shadow);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.compact-heading {
+  margin: 0 0 12px;
+}
+
+.bmi-chip {
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 850;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.bmi-chip.underweight { color: #2f6f84; }
+.bmi-chip.healthy { color: #1f6d56; }
+.bmi-chip.overweight { color: #8a6a1e; }
+.bmi-chip.obese { color: #a04444; }
+
+.bmi-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  display: grid;
+  grid-template-columns: 10.4fr 27.1fr 20.8fr 41.7fr;
+  box-shadow: inset 0 1px 2px rgba(33, 58, 52, 0.12);
+}
+
+.bmi-track span.underweight { background: #9fd6e3; }
+.bmi-track span.healthy { background: #8bd5ad; }
+.bmi-track span.overweight { background: #efd784; }
+.bmi-track span.obese { background: #e8a1a1; }
+
+.bmi-track i {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 20px;
+  border-radius: 999px;
+  background: #213a34;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.68);
+  transform: translateX(-50%);
+}
+
+.bmi-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.goal-calorie-card h3 {
+  margin-bottom: 6px;
+}
+
+.compact-metrics {
+  margin-top: 12px;
+}
+
+.compact-metrics .metric {
+  min-height: 72px;
+}
+
+.goal-calorie-card .tiny {
+  margin-top: 10px;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -62,6 +62,7 @@ export interface ProfileSummary {
   goal: string;
   heightCm: number;
   weightKg: number;
+  targetWeightKg?: number;
   calorieTarget: number;
 }
 

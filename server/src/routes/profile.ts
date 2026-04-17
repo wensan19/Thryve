@@ -37,6 +37,7 @@ profileRouter.put("/", async (request, response) => {
     goal: String(nextProfile.goal ?? user.profile.goal).trim(),
     heightCm: Number(nextProfile.heightCm),
     weightKg: Number(nextProfile.weightKg),
+    targetWeightKg: Number(nextProfile.targetWeightKg ?? nextProfile.weightKg),
     calorieTarget: Number(nextProfile.calorieTarget)
   };
   user.name = user.profile.name;
@@ -65,6 +66,14 @@ function validateProfile(profile: Record<string, unknown>) {
 
   if (!Number.isFinite(Number(profile.weightKg)) || Number(profile.weightKg) < 25) {
     return "Enter a valid weight.";
+  }
+
+  if (
+    !Number.isFinite(Number(profile.targetWeightKg ?? profile.weightKg)) ||
+    Number(profile.targetWeightKg ?? profile.weightKg) < 25 ||
+    Number(profile.targetWeightKg ?? profile.weightKg) > 300
+  ) {
+    return "Enter a valid target weight.";
   }
 
   if (!Number.isFinite(Number(profile.calorieTarget)) || Number(profile.calorieTarget) < 800) {

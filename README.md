@@ -31,6 +31,7 @@ Thryve is a website-first food tracking prototype designed to prove the core pro
 - Meal logs can be saved, viewed, edited, and deleted.
 - Profile picture upload, preview, save, replace, and remove.
 - Profile fields can be edited and persisted in the file-backed user store.
+- Profile includes a visual BMI bar with category colors, target weight, and estimated goal calories.
 - Exercise search, suggestions, forgiving matching, duration, intensity, backend calorie estimate, saved exercise logs, edit, and delete.
 - Custom exercises such as curls, pushups, sit-ups, planks, squats, lunges, jumping jacks, burpees, presses, and deadlifts map to more relevant estimates.
 - Meal uploads reject images over 8 MB and the frontend compresses large images before analysis when possible.
@@ -163,6 +164,19 @@ Meal image uploads are limited to 8 MB on both frontend and backend. The fronten
 Profile pictures are stored as small image data URLs inside the local profile record for this prototype. The profile page supports image preview before saving, replacing an existing photo, and removing it to return to the default avatar.
 
 Current limitation: local JSON storage is fine for prototyping, but production should upload images to object storage and save only image URLs in the database.
+
+## BMI And Weight Goals
+
+The Profile page shows BMI as a visual bar with soft category colors:
+
+- Underweight: below 18.5
+- Healthy: 18.5 to 24.9
+- Overweight: 25 to 29.9
+- Obese: 30 and above
+
+Users can save a target weight in kilograms. Thryve estimates maintenance calories from age, height, and current weight using a simple prototype BMR-style formula with a light activity multiplier. It then suggests gradual goal calories by applying a small adjustment: about 300 calories below maintenance for weight loss, about 250 above maintenance for weight gain, or maintenance when the target is close to the current weight.
+
+These values are prototype wellness estimates only and are not medical or professional nutrition advice.
 
 ## Auth And Persistence
 
