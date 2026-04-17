@@ -7,18 +7,46 @@ interface GeminiExerciseResult {
   met: number;
   confidence: number;
   summary: string;
+  exerciseCategory: string;
+  usedWeightedContext: boolean;
+  usedSetsRepsContext: boolean;
+  usedSideRepContext: boolean;
 }
 
 const exerciseEstimateSchema = {
   type: "OBJECT",
-  required: ["matchedExercise", "estimatedCaloriesBurned", "met", "confidence", "summary"],
-  propertyOrdering: ["matchedExercise", "estimatedCaloriesBurned", "met", "confidence", "summary"],
+  required: [
+    "matchedExercise",
+    "estimatedCaloriesBurned",
+    "met",
+    "confidence",
+    "summary",
+    "exerciseCategory",
+    "usedWeightedContext",
+    "usedSetsRepsContext",
+    "usedSideRepContext"
+  ],
+  propertyOrdering: [
+    "matchedExercise",
+    "estimatedCaloriesBurned",
+    "met",
+    "confidence",
+    "summary",
+    "exerciseCategory",
+    "usedWeightedContext",
+    "usedSetsRepsContext",
+    "usedSideRepContext"
+  ],
   properties: {
     matchedExercise: { type: "STRING" },
     estimatedCaloriesBurned: { type: "NUMBER" },
     met: { type: "NUMBER" },
     confidence: { type: "NUMBER" },
-    summary: { type: "STRING" }
+    summary: { type: "STRING" },
+    exerciseCategory: { type: "STRING" },
+    usedWeightedContext: { type: "BOOLEAN" },
+    usedSetsRepsContext: { type: "BOOLEAN" },
+    usedSideRepContext: { type: "BOOLEAN" }
   }
 };
 
@@ -39,11 +67,23 @@ export async function estimateExerciseWithProvider(request: ExerciseEstimateRequ
 
 function localEstimate(request: ExerciseEstimateRequest): ExerciseEstimate {
   const estimate = estimateExerciseBurn(request);
+  const totalReps = getTotalReps(request);
+  const weightedBoost = request.isWeighted && positiveOptionalNumber(request.weightUsed)
+    ? Math.min(1.18, 1 + (normalizeWeightKg(request.weightUsed, request.weightUnit) / 220))
+    : 1;
+  const repsBoost = totalReps > 0 ? Math.min(1.14, 1 + totalReps / 900) : 1;
+  const adjustedCalories = Math.round(estimate.caloriesBurned * weightedBoost * repsBoost);
+  const category = inferExerciseCategory(estimate.matchedExercise);
   return {
     ...estimate,
+    caloriesBurned: adjustedCalories,
     provider: "local",
     confidence: estimate.isCustom ? 0.48 : 0.72,
-    summary: `${estimate.minutes} min ${estimate.intensity} ${estimate.matchedExercise.toLowerCase()} estimate.`
+    summary: buildSummary(estimate.minutes, estimate.intensity, estimate.matchedExercise, request),
+    exerciseCategory: category,
+    usedWeightedContext: Boolean(request.isWeighted && positiveOptionalNumber(request.weightUsed)),
+    usedSetsRepsContext: Boolean(request.sets || request.reps),
+    usedSideRepContext: Boolean(request.useSideReps)
   };
 }
 
@@ -73,7 +113,10 @@ async function estimateExerciseWithGemini(request: ExerciseEstimateRequest): Pro
                 `Estimate calories burned for a wellness app. Return JSON only according to the schema. ` +
                 `Interpret the typed exercise carefully and do not map distinct movements incorrectly. ` +
                 `For example, pull ups are not pushups, incline walking is not running, and curls are strength training. ` +
-                `User input: exercise="${request.type}", duration=${request.minutes} minutes, intensity=${request.intensity}, bodyWeightKg=${request.bodyWeightKg ?? 70}. ` +
+                `User input: exercise="${request.type}", duration=${request.minutes} minutes, intensity=${request.intensity}, bodyWeightKg=${request.bodyWeightKg ?? 70}, ` +
+                `isWeighted=${Boolean(request.isWeighted)}, weightUsed=${request.weightUsed ?? 0} ${request.weightUnit ?? "kg"}, sets=${request.sets ?? 0}, reps=${request.reps ?? 0}, ` +
+                `useSideReps=${Boolean(request.useSideReps)}, leftReps=${request.leftReps ?? 0}, rightReps=${request.rightReps ?? 0}. ` +
+                `If weighted or sets/reps context is provided, use it as rough context for work performed, but keep calories realistic and conservative. ` +
                 `A local fallback estimate is matchedExercise="${local.matchedExercise}", met=${local.met}, calories=${local.caloriesBurned}; use it only as a sanity check. ` +
                 `Keep the summary under 90 characters.`
             }
@@ -108,7 +151,11 @@ async function estimateExerciseWithGemini(request: ExerciseEstimateRequest): Pro
     met,
     confidence: clamp01(parsed.confidence),
     summary: parsed.summary || `${request.minutes} min ${request.intensity} ${request.type.trim()} estimate.`,
-    provider: "gemini"
+    provider: "gemini",
+    exerciseCategory: parsed.exerciseCategory || inferExerciseCategory(parsed.matchedExercise),
+    usedWeightedContext: Boolean(parsed.usedWeightedContext),
+    usedSetsRepsContext: Boolean(parsed.usedSetsRepsContext),
+    usedSideRepContext: Boolean(parsed.usedSideRepContext)
   };
 }
 
@@ -126,12 +173,23 @@ export function normalizeExerciseEstimateRequest(body: any, fallbackWeightKg = 7
   const intensity = ["low", "medium", "high"].includes(rawIntensity) ? rawIntensity as ExerciseIntensity : "medium";
   const minutes = Number(body?.minutes);
   const bodyWeightKg = Number(body?.bodyWeightKg);
+  const weightUnit = body?.weightUnit === "lb" ? "lb" : "kg";
+  const useSideReps = Boolean(body?.useSideReps);
 
   return {
     type: rawType.trim(),
     minutes: Number.isFinite(minutes) ? minutes : 25,
     intensity,
-    bodyWeightKg: Number.isFinite(bodyWeightKg) && bodyWeightKg > 0 ? bodyWeightKg : fallbackWeightKg
+    bodyWeightKg: Number.isFinite(bodyWeightKg) && bodyWeightKg > 0 ? bodyWeightKg : fallbackWeightKg,
+    isWeighted: Boolean(body?.isWeighted),
+    weightUsed: optionalPositiveNumber(body?.weightUsed),
+    weightUnit,
+    sets: optionalPositiveNumber(body?.sets),
+    reps: optionalPositiveNumber(body?.reps),
+    useSideReps,
+    leftReps: optionalPositiveNumber(body?.leftReps),
+    rightReps: optionalPositiveNumber(body?.rightReps),
+    caloriesBurnedOverride: optionalPositiveNumber(body?.caloriesBurnedOverride)
   };
 }
 
@@ -153,6 +211,44 @@ export function validateExerciseEstimateRequest(request: ExerciseEstimateRequest
   }
 
   return "";
+}
+
+function getTotalReps(request: ExerciseEstimateRequest) {
+  const sets = request.sets && request.sets > 0 ? request.sets : 1;
+  if (request.useSideReps) {
+    return sets * ((request.leftReps ?? 0) + (request.rightReps ?? 0));
+  }
+  return sets * (request.reps ?? 0);
+}
+
+function buildSummary(minutes: number, intensity: ExerciseEstimate["intensity"], exercise: string, request: ExerciseEstimateRequest) {
+  const weighted = request.isWeighted && request.weightUsed ? `, ${request.weightUsed} ${request.weightUnit ?? "kg"}` : "";
+  const reps = request.useSideReps
+    ? `, ${request.sets ?? 1} sets x L${request.leftReps ?? 0}/R${request.rightReps ?? 0}`
+    : request.reps ? `, ${request.sets ?? 1} sets x ${request.reps}` : "";
+  return `${minutes} min ${intensity} ${exercise.toLowerCase()}${weighted}${reps}.`;
+}
+
+function inferExerciseCategory(label: string) {
+  const normalized = label.toLowerCase();
+  if (/run|walk|treadmill|cycling|swim|stair|elliptical|row/.test(normalized)) return "cardio";
+  if (/yoga|pilates|stretch|mobility|plank/.test(normalized)) return "mobility";
+  if (/curl|press|deadlift|squat|lunge|pull|push|dip|row|lat|barbell|dumbbell|machine/.test(normalized)) return "strength";
+  return "general";
+}
+
+function normalizeWeightKg(weight: number | undefined, unit: "kg" | "lb" | undefined) {
+  if (!weight) return 0;
+  return unit === "lb" ? weight * 0.453592 : weight;
+}
+
+function optionalPositiveNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : undefined;
+}
+
+function positiveOptionalNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function cleanLabel(value: string, fallback: string) {

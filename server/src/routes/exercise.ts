@@ -51,15 +51,26 @@ exerciseRouter.post("/", async (request, response) => {
   }
 
   const estimate = await estimateExerciseWithProvider(estimateRequest);
+  const caloriesBurned = estimateRequest.caloriesBurnedOverride ?? estimate.caloriesBurned;
   const log: ExerciseLog = {
     id: crypto.randomUUID(),
     type: estimate.type,
     minutes: estimate.minutes,
     intensity: estimate.intensity,
-    caloriesBurned: estimate.caloriesBurned,
+    caloriesBurned,
     loggedAt: new Date().toISOString(),
     imageUrl: typeof imageUrl === "string" ? imageUrl : "",
-    notes: typeof notes === "string" ? notes : ""
+    notes: typeof notes === "string" ? notes : "",
+    isWeighted: estimateRequest.isWeighted,
+    weightUsed: estimateRequest.weightUsed,
+    weightUnit: estimateRequest.weightUnit,
+    sets: estimateRequest.sets,
+    reps: estimateRequest.reps,
+    useSideReps: estimateRequest.useSideReps,
+    leftReps: estimateRequest.leftReps,
+    rightReps: estimateRequest.rightReps,
+    estimatedCaloriesBurned: estimate.caloriesBurned,
+    caloriesManuallyOverridden: caloriesBurned !== estimate.caloriesBurned
   };
 
   user.exercises.unshift(log);
@@ -85,15 +96,26 @@ exerciseRouter.put("/:id", async (request, response) => {
   }
 
   const estimate = await estimateExerciseWithProvider(estimateRequest);
+  const caloriesBurned = estimateRequest.caloriesBurnedOverride ?? estimate.caloriesBurned;
 
   const updated: ExerciseLog = {
     ...user.exercises[index],
     type: estimate.type,
     minutes: estimate.minutes,
     intensity: estimate.intensity,
-    caloriesBurned: estimate.caloriesBurned,
+    caloriesBurned,
     imageUrl: typeof imageUrl === "string" ? imageUrl : user.exercises[index].imageUrl,
-    notes: typeof notes === "string" ? notes : user.exercises[index].notes
+    notes: typeof notes === "string" ? notes : user.exercises[index].notes,
+    isWeighted: estimateRequest.isWeighted,
+    weightUsed: estimateRequest.weightUsed,
+    weightUnit: estimateRequest.weightUnit,
+    sets: estimateRequest.sets,
+    reps: estimateRequest.reps,
+    useSideReps: estimateRequest.useSideReps,
+    leftReps: estimateRequest.leftReps,
+    rightReps: estimateRequest.rightReps,
+    estimatedCaloriesBurned: estimate.caloriesBurned,
+    caloriesManuallyOverridden: caloriesBurned !== estimate.caloriesBurned
   };
 
   user.exercises[index] = updated;

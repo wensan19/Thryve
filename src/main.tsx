@@ -15,6 +15,7 @@ import {
 import type {
   AuthUser,
   ExerciseEstimate,
+  ExerciseEstimateRequest,
   ExerciseIntensity,
   ExerciseLog,
   FeedComment,
@@ -179,8 +180,7 @@ function App() {
     return saved;
   }
 
-  async function saveExercise(type: string, minutes: number, intensity: ExerciseIntensity, editingId?: string, imageUrl?: string) {
-    const request = { type, minutes, intensity, bodyWeightKg: profile.weightKg, imageUrl };
+  async function saveExercise(request: ExerciseEstimateRequest, editingId?: string) {
     const saved = editingId ? await api.updateExercise(editingId, request) : await api.saveExercise(request);
     setExerciseLogs((current) => {
       const exists = current.some((log) => log.id === saved.id);
@@ -749,7 +749,7 @@ function ExerciseScreen({
 }: {
   logs: ExerciseLog[];
   profile: ProfileSummary;
-  onSave: (type: string, minutes: number, intensity: ExerciseIntensity, editingId?: string, imageUrl?: string) => Promise<ExerciseLog>;
+  onSave: (request: ExerciseEstimateRequest, editingId?: string) => Promise<ExerciseLog>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const [editingId, setEditingId] = useState("");
@@ -760,7 +760,31 @@ function ExerciseScreen({
   const [status, setStatus] = useState<AsyncState>("idle");
   const [message, setMessage] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [isWeighted, setIsWeighted] = useState(false);
+  const [weightUsed, setWeightUsed] = useState(10);
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
+  const [sets, setSets] = useState(3);
+  const [reps, setReps] = useState(10);
+  const [useSideReps, setUseSideReps] = useState(false);
+  const [leftReps, setLeftReps] = useState(10);
+  const [rightReps, setRightReps] = useState(10);
+  const [calorieInput, setCalorieInput] = useState("");
+  const [manualCalories, setManualCalories] = useState(false);
   const suggestions = getExerciseSuggestions(type, 4);
+  const estimateRequest: ExerciseEstimateRequest = {
+    type,
+    minutes,
+    intensity,
+    bodyWeightKg: profile.weightKg,
+    isWeighted,
+    weightUsed: isWeighted ? weightUsed : undefined,
+    weightUnit,
+    sets,
+    reps: useSideReps ? undefined : reps,
+    useSideReps,
+    leftReps: useSideReps ? leftReps : undefined,
+    rightReps: useSideReps ? rightReps : undefined
+  };
 
   useEffect(() => {
     if (type.trim().length < 2 || !Number.isFinite(minutes) || minutes < 1) {
@@ -770,9 +794,12 @@ function ExerciseScreen({
 
     const timeout = window.setTimeout(() => {
       api
-        .estimateExercise({ type, minutes, intensity, bodyWeightKg: profile.weightKg })
+        .estimateExercise(estimateRequest)
         .then((nextEstimate) => {
           setEstimate(nextEstimate);
+          if (!manualCalories) {
+            setCalorieInput(String(nextEstimate.caloriesBurned));
+          }
           setStatus((current) => current === "error" ? "idle" : current);
           setMessage((current) => isExerciseEstimateError(current) ? "" : current);
         })
@@ -782,7 +809,7 @@ function ExerciseScreen({
         });
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [intensity, minutes, profile.weightKg, type]);
+  }, [intensity, isWeighted, leftReps, manualCalories, minutes, profile.weightKg, reps, rightReps, sets, type, useSideReps, weightUnit, weightUsed]);
 
   function edit(log: ExerciseLog) {
     setEditingId(log.id);
@@ -790,13 +817,24 @@ function ExerciseScreen({
     setMinutes(log.minutes);
     setIntensity(log.intensity);
     setImageUrl(log.imageUrl ?? "");
+    setIsWeighted(Boolean(log.isWeighted));
+    setWeightUsed(log.weightUsed ?? 10);
+    setWeightUnit(log.weightUnit ?? "kg");
+    setSets(log.sets ?? 3);
+    setReps(log.reps ?? 10);
+    setUseSideReps(Boolean(log.useSideReps));
+    setLeftReps(log.leftReps ?? 10);
+    setRightReps(log.rightReps ?? 10);
+    setCalorieInput(String(log.caloriesBurned));
+    setManualCalories(Boolean(log.caloriesManuallyOverridden));
   }
 
   async function save() {
     setStatus("loading");
     setMessage("");
     try {
-      await onSave(type, minutes, intensity, editingId || undefined, imageUrl);
+      const caloriesBurnedOverride = manualCalories ? Number(calorieInput) : undefined;
+      await onSave({ ...estimateRequest, imageUrl, caloriesBurnedOverride }, editingId || undefined);
       setEditingId("");
       setStatus("success");
       setMessage("Exercise saved.");
@@ -845,7 +883,10 @@ function ExerciseScreen({
             <option value="Weight Lifting" /><option value="HIIT" /><option value="Dance" />
             <option value="Badminton" /><option value="Tennis" /><option value="Basketball" />
             <option value="Football" /><option value="Volleyball" /><option value="Hiking" />
-            <option value="Rowing" /><option value="Elliptical" />
+            <option value="Rowing" /><option value="Elliptical" /><option value="Pull-ups" />
+            <option value="Dips" /><option value="Bicep Curls" /><option value="Shoulder Press" />
+            <option value="Bench Press" /><option value="Deadlift" /><option value="Goblet Squat" />
+            <option value="Lat Pulldown" /><option value="Cable Row" />
           </datalist>
         </label>
         <div className="quick-picks">
@@ -862,9 +903,58 @@ function ExerciseScreen({
             </select>
           </label>
         </div>
+        <div className="exercise-options">
+          <label className="inline-check">
+            <input type="checkbox" checked={isWeighted} onChange={(event) => setIsWeighted(event.target.checked)} />
+            <span>Weighted exercise</span>
+          </label>
+          {isWeighted && (
+            <div className="form-grid">
+              <label><span>Weight used</span><input type="number" min="0" value={weightUsed} onChange={(event) => setWeightUsed(Number(event.target.value))} /></label>
+              <label>
+                <span>Unit</span>
+                <select value={weightUnit} onChange={(event) => setWeightUnit(event.target.value as "kg" | "lb")}>
+                  <option value="kg">kg</option><option value="lb">lb</option>
+                </select>
+              </label>
+            </div>
+          )}
+          <div className="form-grid">
+            <label><span>Sets</span><input type="number" min="1" value={sets} onChange={(event) => setSets(Number(event.target.value))} /></label>
+            <label><span>{useSideReps ? "Reps per side" : "Reps"}</span><input type="number" min="1" value={reps} onChange={(event) => setReps(Number(event.target.value))} disabled={useSideReps} /></label>
+          </div>
+          <label className="inline-check">
+            <input type="checkbox" checked={useSideReps} onChange={(event) => setUseSideReps(event.target.checked)} />
+            <span>Separate left / right reps</span>
+          </label>
+          {useSideReps && (
+            <div className="form-grid">
+              <label><span>Left reps</span><input type="number" min="1" value={leftReps} onChange={(event) => setLeftReps(Number(event.target.value))} /></label>
+              <label><span>Right reps</span><input type="number" min="1" value={rightReps} onChange={(event) => setRightReps(Number(event.target.value))} /></label>
+            </div>
+          )}
+        </div>
         <div className="calorie-estimate">
-          <span>{estimate?.summary || (estimate?.isCustom ? "Custom estimate" : `Matched: ${estimate?.matchedExercise ?? "Exercise"}`)}</span>
-          <strong>{estimate?.caloriesBurned ?? 0} cal</strong>
+          <span>{manualCalories ? "Manually adjusted" : estimate?.summary || (estimate?.isCustom ? "Custom estimate" : `Matched: ${estimate?.matchedExercise ?? "Exercise"}`)}</span>
+          <strong>{Number(calorieInput) || estimate?.caloriesBurned || 0} cal</strong>
+        </div>
+        <div className="calorie-override">
+          <label>
+            <span>Calories burned</span>
+            <input
+              type="number"
+              min="0"
+              value={calorieInput}
+              onChange={(event) => {
+                setCalorieInput(event.target.value);
+                setManualCalories(Number(event.target.value) !== (estimate?.caloriesBurned ?? 0));
+              }}
+            />
+          </label>
+          {manualCalories && <button type="button" onClick={() => {
+            setCalorieInput(String(estimate?.caloriesBurned ?? 0));
+            setManualCalories(false);
+          }}>Reset estimate</button>}
         </div>
         <div className="avatar-edit">
           <label className="secondary-button">
@@ -887,7 +977,7 @@ function ExerciseScreen({
               <Activity size={20} />
               <div>
                 <strong>{log.type}</strong>
-                <span>{log.minutes} min / {log.intensity} intensity / {log.caloriesBurned} calories burned</span>
+                <span>{exerciseLogDetail(log)}</span>
               </div>
               <div className="mini-actions">
                 <button onClick={() => edit(log)}>Edit</button>
@@ -1222,6 +1312,17 @@ function isExerciseEstimateError(message: string) {
     "Could not reach the Thryve server.",
     "Your session expired."
   ].some((text) => message.includes(text));
+}
+
+function exerciseLogDetail(log: ExerciseLog) {
+  const reps = log.useSideReps
+    ? `${log.sets ?? 1} sets x L${log.leftReps ?? 0}/R${log.rightReps ?? 0}`
+    : log.reps ? `${log.sets ?? 1} sets x ${log.reps}` : "";
+  const weight = log.isWeighted && log.weightUsed ? `${log.weightUsed} ${log.weightUnit ?? "kg"}` : "";
+  const manual = log.caloriesManuallyOverridden ? " / adjusted" : "";
+  return [ `${log.minutes} min`, `${log.intensity} intensity`, weight, reps, `${log.caloriesBurned} calories burned${manual}` ]
+    .filter(Boolean)
+    .join(" / ");
 }
 
 function Avatar({ name, photoUrl }: { name: string; photoUrl?: string }) {

@@ -42,6 +42,16 @@ export interface ExerciseLog {
   loggedAt: string;
   imageUrl?: string;
   notes?: string;
+  isWeighted?: boolean;
+  weightUsed?: number;
+  weightUnit?: "kg" | "lb";
+  sets?: number;
+  reps?: number;
+  useSideReps?: boolean;
+  leftReps?: number;
+  rightReps?: number;
+  estimatedCaloriesBurned?: number;
+  caloriesManuallyOverridden?: boolean;
 }
 
 export interface ProfileSummary {
@@ -60,6 +70,17 @@ export interface ExerciseEstimateRequest {
   minutes: number;
   intensity: ExerciseIntensity;
   bodyWeightKg?: number;
+  isWeighted?: boolean;
+  weightUsed?: number;
+  weightUnit?: "kg" | "lb";
+  sets?: number;
+  reps?: number;
+  useSideReps?: boolean;
+  leftReps?: number;
+  rightReps?: number;
+  caloriesBurnedOverride?: number;
+  imageUrl?: string;
+  notes?: string;
 }
 
 export interface ExerciseEstimate {
@@ -73,6 +94,10 @@ export interface ExerciseEstimate {
   confidence?: number;
   summary?: string;
   provider?: "gemini" | "local";
+  exerciseCategory?: string;
+  usedWeightedContext?: boolean;
+  usedSetsRepsContext?: boolean;
+  usedSideRepContext?: boolean;
 }
 
 export interface FeedPost {

@@ -138,7 +138,7 @@ OpenAI variables such as `OPENAI_API_KEY` and `OPENAI_FOOD_MODEL` are no longer 
 
 ## Exercise Recognition
 
-Exercise estimates use a backend provider layer in `server/src/services/exerciseAi.ts`. When `FOOD_VISION_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the backend asks Gemini to interpret the typed exercise, duration, intensity, and body weight, then returns structured JSON with matched exercise, calories burned, confidence, and a short summary.
+Exercise estimates use a backend provider layer in `server/src/services/exerciseAi.ts`. When `FOOD_VISION_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the backend asks Gemini to interpret the typed exercise, duration, intensity, body weight, weighted-exercise context, sets, reps, and optional left/right rep breakdown. It returns structured JSON with matched exercise, calories burned, confidence, summary, exercise category, and whether weighted or sets/reps context was used.
 
 If Gemini is unavailable or fails, Thryve logs the fallback and uses the local estimator in `shared/nutrition.ts`. The local fallback recognizes common activities such as walking, running, jogging, treadmill, cycling, swimming, skipping, stairs, yoga, pilates, stretching, strength training, weight lifting, HIIT, dance, badminton, tennis, basketball, football, volleyball, hiking, rowing, elliptical, curls, pull-ups, pushups, sit-ups, planks, squats, lunges, jumping jacks, burpees, mountain climbers, shoulder press, bench press, deadlift, stairmaster, and incline walking.
 
@@ -149,6 +149,8 @@ Backend logs show the active estimator:
 - Gemini failure fallback: `[exercise-ai] Gemini failed; falling back to local estimator`
 
 The exercise estimate route remains authenticated because it is part of the logged-in app and may use profile data such as body weight. If the deployed backend returns `401`, the frontend clears the stale token and asks the user to log in again. Render redeploys or expired sessions can invalidate old browser tokens.
+
+The Exercise page supports weighted workout logging with weight used, kg/lb units, sets, reps, and optional separate left/right reps for unilateral exercises. Users can edit the displayed calories burned before saving; saved logs store both the original estimate and whether the calories were manually adjusted. A reset button restores the latest AI/local estimate.
 
 ## Food Correction And Upload Limits
 
