@@ -51,6 +51,14 @@ npm run dev
 
 The web app runs at `http://localhost:5173`. The API runs at `http://localhost:8787`.
 
+For production frontend deployments, set this Vercel environment variable:
+
+```bash
+VITE_API_BASE_URL=https://thryve-cffg.onrender.com
+```
+
+Local development falls back to `http://localhost:8787` when `VITE_API_BASE_URL` is not set. Production builds do not fall back to localhost.
+
 You can also run each side separately:
 
 ```bash
@@ -67,7 +75,7 @@ The Vite frontend is configured with `--host 0.0.0.0`, so it can be opened from 
 2. Keep `npm run dev` running.
 3. Open `http://YOUR_LOCAL_IP:5173` on your phone.
 
-The frontend automatically calls the API at `http://YOUR_LOCAL_IP:8787`, so uploads and exercise/profile saves work from the phone browser too. If Windows Firewall asks for permission, allow Node.js on your private network.
+For phone testing, set `VITE_API_BASE_URL=http://YOUR_LOCAL_IP:8787` before starting the frontend so your phone can reach the backend. If Windows Firewall asks for permission, allow Node.js on your private network.
 
 ## Consent And Safety
 

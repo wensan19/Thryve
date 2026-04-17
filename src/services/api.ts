@@ -206,9 +206,15 @@ export class ApiClient {
 }
 
 function getApiBaseUrl() {
-  if (typeof window === "undefined") {
-    return "http://127.0.0.1:8787";
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/$/, "");
   }
 
-  return `${window.location.protocol}//${window.location.hostname}:8787`;
+  if (import.meta.env.DEV) {
+    return "http://localhost:8787";
+  }
+
+  return "";
 }
