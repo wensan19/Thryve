@@ -117,6 +117,7 @@ const exerciseCatalog = [
   { label: "Elliptical", met: 5.0, terms: ["elliptical", "cross trainer", "crosstrainer"] }
   ,
   { label: "Bicep Curls", met: 3.5, terms: ["curl", "curls", "bicep curl", "biceps curl", "dumbbell curl"] },
+  { label: "Pull-ups", met: 8.0, terms: ["pullup", "pull up", "pull-up", "pullups", "pull ups", "chin up", "chin-up", "chinups"] },
   { label: "Pushups", met: 4.0, terms: ["pushup", "push up", "push-up", "press up"] },
   { label: "Sit-ups", met: 3.8, terms: ["situp", "sit up", "sit-up", "crunch", "crunches"] },
   { label: "Plank", met: 3.0, terms: ["plank", "planks", "side plank"] },

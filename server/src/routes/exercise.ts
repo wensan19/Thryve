@@ -1,7 +1,11 @@
 import { Router } from "express";
-import type { ExerciseIntensity, ExerciseLog } from "../../../shared/types.js";
+import type { ExerciseLog } from "../../../shared/types.js";
 import { findUserById, persistUserChange } from "../data/store.js";
-import { estimateExerciseBurn } from "../services/calories.js";
+import {
+  estimateExerciseWithProvider,
+  normalizeExerciseEstimateRequest,
+  validateExerciseEstimateRequest
+} from "../services/exerciseAi.js";
 
 export const exerciseRouter = Router();
 
@@ -10,46 +14,38 @@ exerciseRouter.get("/", async (request, response) => {
   response.json(user?.exercises ?? []);
 });
 
-exerciseRouter.post("/estimate", (request, response) => {
-  const { type = "Walking", minutes = 25, intensity = "medium", bodyWeightKg = 70 } = request.body ?? {};
-  const validationError = validateExerciseInput(type, minutes, intensity);
+exerciseRouter.post("/estimate", async (request, response) => {
+  const user = await findUserById(request.userId!);
+  const estimateRequest = normalizeExerciseEstimateRequest(request.body, user?.profile.weightKg ?? 70);
+  const validationError = validateExerciseEstimateRequest(estimateRequest);
 
   if (validationError) {
     response.status(400).json({ message: validationError });
     return;
   }
 
-  const estimate = estimateExerciseBurn({
-    type,
-    minutes: Number(minutes),
-    intensity: intensity as ExerciseIntensity,
-    bodyWeightKg: Number(bodyWeightKg)
-  });
+  const estimate = await estimateExerciseWithProvider(estimateRequest);
 
   response.json(estimate);
 });
 
 exerciseRouter.post("/", async (request, response) => {
-  const { type = "Walking", minutes = 25, intensity = "medium", bodyWeightKg = 70, imageUrl = "", notes = "" } = request.body ?? {};
-  const validationError = validateExerciseInput(type, minutes, intensity);
+  const user = await findUserById(request.userId!);
+  const estimateRequest = normalizeExerciseEstimateRequest(request.body, user?.profile.weightKg ?? 70);
+  const { imageUrl = "", notes = "" } = request.body ?? {};
+  const validationError = validateExerciseEstimateRequest(estimateRequest);
 
   if (validationError) {
     response.status(400).json({ message: validationError });
     return;
   }
 
-  const user = await findUserById(request.userId!);
   if (!user) {
     response.status(404).json({ message: "User not found." });
     return;
   }
 
-  const estimate = estimateExerciseBurn({
-    type,
-    minutes: Number(minutes),
-    intensity: intensity as ExerciseIntensity,
-    bodyWeightKg: Number(bodyWeightKg)
-  });
+  const estimate = await estimateExerciseWithProvider(estimateRequest);
   const log: ExerciseLog = {
     id: crypto.randomUUID(),
     type: estimate.type,
@@ -69,8 +65,9 @@ exerciseRouter.post("/", async (request, response) => {
 exerciseRouter.put("/:id", async (request, response) => {
   const user = await findUserById(request.userId!);
   const index = user?.exercises.findIndex((log) => log.id === request.params.id) ?? -1;
-  const { type, minutes, intensity, bodyWeightKg = user?.profile.weightKg ?? 70, imageUrl, notes } = request.body ?? {};
-  const validationError = validateExerciseInput(type, minutes, intensity);
+  const { imageUrl, notes } = request.body ?? {};
+  const estimateRequest = normalizeExerciseEstimateRequest(request.body, user?.profile.weightKg ?? 70);
+  const validationError = validateExerciseEstimateRequest(estimateRequest);
 
   if (!user || index < 0) {
     response.status(404).json({ message: "Exercise not found." });
@@ -82,12 +79,7 @@ exerciseRouter.put("/:id", async (request, response) => {
     return;
   }
 
-  const estimate = estimateExerciseBurn({
-    type,
-    minutes: Number(minutes),
-    intensity: intensity as ExerciseIntensity,
-    bodyWeightKg: Number(bodyWeightKg)
-  });
+  const estimate = await estimateExerciseWithProvider(estimateRequest);
 
   const updated: ExerciseLog = {
     ...user.exercises[index],
@@ -123,19 +115,3 @@ exerciseRouter.delete("/:id", async (request, response) => {
   await persistUserChange();
   response.status(204).end();
 });
-
-function validateExerciseInput(type: unknown, minutes: unknown, intensity: unknown) {
-  if (typeof type !== "string" || type.trim().length < 2) {
-    return "Enter an exercise type.";
-  }
-
-  if (!Number.isFinite(Number(minutes)) || Number(minutes) < 1 || Number(minutes) > 600) {
-    return "Duration should be 1 to 600 minutes.";
-  }
-
-  if (!["low", "medium", "high"].includes(String(intensity))) {
-    return "Choose a valid intensity.";
-  }
-
-  return "";
-}

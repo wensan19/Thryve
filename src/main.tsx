@@ -763,13 +763,18 @@ function ExerciseScreen({
   const suggestions = getExerciseSuggestions(type, 4);
 
   useEffect(() => {
+    if (type.trim().length < 2 || !Number.isFinite(minutes) || minutes < 1) {
+      setEstimate(undefined);
+      return;
+    }
+
     const timeout = window.setTimeout(() => {
       api
         .estimateExercise({ type, minutes, intensity, bodyWeightKg: profile.weightKg })
         .then(setEstimate)
         .catch((error) => {
           setStatus("error");
-          setMessage(error instanceof Error ? error.message : "Could not estimate this exercise.");
+          setMessage(error instanceof Error ? error.message : "Could not estimate this exercise. Check your login and try again.");
         });
     }, 250);
     return () => window.clearTimeout(timeout);
@@ -854,7 +859,7 @@ function ExerciseScreen({
           </label>
         </div>
         <div className="calorie-estimate">
-          <span>{estimate?.isCustom ? "Custom estimate" : `Matched: ${estimate?.matchedExercise ?? "Exercise"}`}</span>
+          <span>{estimate?.summary || (estimate?.isCustom ? "Custom estimate" : `Matched: ${estimate?.matchedExercise ?? "Exercise"}`)}</span>
           <strong>{estimate?.caloriesBurned ?? 0} cal</strong>
         </div>
         <div className="avatar-edit">

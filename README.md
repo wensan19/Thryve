@@ -129,9 +129,17 @@ OpenAI variables such as `OPENAI_API_KEY` and `OPENAI_FOOD_MODEL` are no longer 
 
 ## Exercise Recognition
 
-Exercise estimates use the shared logic in `shared/nutrition.ts`. It recognizes common activities such as walking, running, jogging, treadmill, cycling, swimming, skipping, stairs, yoga, pilates, stretching, strength training, weight lifting, HIIT, dance, badminton, tennis, basketball, football, volleyball, hiking, rowing, elliptical, curls, pushups, sit-ups, planks, squats, lunges, jumping jacks, burpees, mountain climbers, shoulder press, bench press, deadlift, stairmaster, and incline walking.
+Exercise estimates use a backend provider layer in `server/src/services/exerciseAi.ts`. When `FOOD_VISION_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the backend asks Gemini to interpret the typed exercise, duration, intensity, and body weight, then returns structured JSON with matched exercise, calories burned, confidence, and a short summary.
 
-The matcher handles partial names, common phrases, and simple typos where reasonable. If nothing matches, Thryve treats the entry as custom and uses a moderate fallback estimate instead of failing.
+If Gemini is unavailable or fails, Thryve logs the fallback and uses the local estimator in `shared/nutrition.ts`. The local fallback recognizes common activities such as walking, running, jogging, treadmill, cycling, swimming, skipping, stairs, yoga, pilates, stretching, strength training, weight lifting, HIIT, dance, badminton, tennis, basketball, football, volleyball, hiking, rowing, elliptical, curls, pull-ups, pushups, sit-ups, planks, squats, lunges, jumping jacks, burpees, mountain climbers, shoulder press, bench press, deadlift, stairmaster, and incline walking.
+
+Backend logs show the active estimator:
+
+- Gemini path: `[exercise-ai] using Gemini provider`
+- Local fallback: `[exercise-ai] using local fallback`
+- Gemini failure fallback: `[exercise-ai] Gemini failed; falling back to local estimator`
+
+The exercise estimate route remains authenticated because it is part of the logged-in app and may use profile data such as body weight. If the deployed backend returns `401`, the frontend clears the stale token and asks the user to log in again. Render redeploys or expired sessions can invalidate old browser tokens.
 
 ## Food Correction And Upload Limits
 

@@ -70,6 +70,9 @@ export interface ExerciseEstimate {
   intensity: ExerciseIntensity;
   caloriesBurned: number;
   met: number;
+  confidence?: number;
+  summary?: string;
+  provider?: "gemini" | "local";
 }
 
 export interface FeedPost {
