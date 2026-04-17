@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { dirname, join } from "node:path";
 import type { AuthUser, ExerciseLog, FeedComment, FeedPost, MealLog, ProfileSummary } from "../../../shared/types.js";
 
@@ -33,6 +34,7 @@ interface SocialReaction {
 
 const databasePath = join(process.cwd(), "server", "data", "thryve.json");
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
+const signedTokenPrefix = "thryve.v1";
 
 const defaultFeedPosts: FeedPost[] = [
   {
@@ -135,11 +137,13 @@ export async function createUser(name: string, email: string, passwordHash: stri
 export async function createSession(userId: string) {
   const db = await getDatabase();
   const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + sessionDurationMs);
+  const token = createSignedToken(userId, createdAt, expiresAt);
   const session = {
-    token: crypto.randomUUID(),
+    token,
     userId,
     createdAt: createdAt.toISOString(),
-    expiresAt: new Date(createdAt.getTime() + sessionDurationMs).toISOString()
+    expiresAt: expiresAt.toISOString()
   };
 
   db.sessions.push(session);
@@ -153,6 +157,11 @@ export async function findUserByToken(token?: string) {
   }
 
   const db = await getDatabase();
+  const signedTokenUserId = verifySignedToken(token);
+  if (signedTokenUserId) {
+    return db.users.find((user) => user.id === signedTokenUserId);
+  }
+
   const session = db.sessions.find((item) => item.token === token);
   if (session && new Date(session.expiresAt).getTime() <= Date.now()) {
     db.sessions = db.sessions.filter((item) => item.token !== token);
@@ -167,6 +176,55 @@ export async function deleteSession(token: string) {
   const db = await getDatabase();
   db.sessions = db.sessions.filter((session) => session.token !== token);
   await saveDatabase();
+}
+
+function createSignedToken(userId: string, createdAt: Date, expiresAt: Date) {
+  const payload = base64UrlEncode(JSON.stringify({
+    sub: userId,
+    iat: Math.floor(createdAt.getTime() / 1000),
+    exp: Math.floor(expiresAt.getTime() / 1000)
+  }));
+  const signature = signTokenPayload(payload);
+  return `${signedTokenPrefix}.${payload}.${signature}`;
+}
+
+function verifySignedToken(token: string) {
+  const [prefix, version, payload, signature] = token.split(".");
+  if (`${prefix}.${version}` !== signedTokenPrefix || !payload || !signature) {
+    return "";
+  }
+
+  if (!constantTimeEqual(signature, signTokenPayload(payload))) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { sub?: string; exp?: number };
+    if (!parsed.sub || !parsed.exp || parsed.exp <= Math.floor(Date.now() / 1000)) {
+      return "";
+    }
+    return parsed.sub;
+  } catch {
+    return "";
+  }
+}
+
+function signTokenPayload(payload: string) {
+  return createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
+}
+
+function getSessionSecret() {
+  return process.env.SESSION_SECRET || process.env.GEMINI_API_KEY || "thryve-development-session-secret";
+}
+
+function base64UrlEncode(value: string) {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+function constantTimeEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 export function publicUser(user: StoredUser): AuthUser {

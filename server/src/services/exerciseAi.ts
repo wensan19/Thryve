@@ -121,7 +121,7 @@ function parseGeminiStructuredOutput(body: any): GeminiExerciseResult {
 }
 
 export function normalizeExerciseEstimateRequest(body: any, fallbackWeightKg = 70): ExerciseEstimateRequest {
-  const rawType = typeof body?.type === "string" ? body.type : "";
+  const rawType = firstString(body?.type, body?.exercise, body?.exerciseType, body?.name, body?.matchedExercise);
   const rawIntensity = typeof body?.intensity === "string" ? body.intensity.toLowerCase() : "medium";
   const intensity = ["low", "medium", "high"].includes(rawIntensity) ? rawIntensity as ExerciseIntensity : "medium";
   const minutes = Number(body?.minutes);
@@ -133,6 +133,10 @@ export function normalizeExerciseEstimateRequest(body: any, fallbackWeightKg = 7
     intensity,
     bodyWeightKg: Number.isFinite(bodyWeightKg) && bodyWeightKg > 0 ? bodyWeightKg : fallbackWeightKg
   };
+}
+
+function firstString(...values: unknown[]) {
+  return values.find((value): value is string => typeof value === "string") ?? "";
 }
 
 export function validateExerciseEstimateRequest(request: ExerciseEstimateRequest) {

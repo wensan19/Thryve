@@ -771,7 +771,11 @@ function ExerciseScreen({
     const timeout = window.setTimeout(() => {
       api
         .estimateExercise({ type, minutes, intensity, bodyWeightKg: profile.weightKg })
-        .then(setEstimate)
+        .then((nextEstimate) => {
+          setEstimate(nextEstimate);
+          setStatus((current) => current === "error" ? "idle" : current);
+          setMessage((current) => isExerciseEstimateError(current) ? "" : current);
+        })
         .catch((error) => {
           setStatus("error");
           setMessage(error instanceof Error ? error.message : "Could not estimate this exercise. Check your login and try again.");
@@ -846,7 +850,7 @@ function ExerciseScreen({
         </label>
         <div className="quick-picks">
           {suggestions.map((suggestion) => (
-            <button key={suggestion} onClick={() => setType(suggestion)}>{suggestion}</button>
+            <button type="button" key={suggestion} onClick={() => setType(suggestion)}>{suggestion}</button>
           ))}
         </div>
         <div className="form-grid">
@@ -1207,6 +1211,17 @@ function workoutDescription(post: FeedPost) {
   const minutes = post.durationMinutes ? `${post.durationMinutes} min` : "Quick";
   const intensity = post.intensity === "high" ? "energetic" : post.intensity === "low" ? "light" : "moderate";
   return `${minutes} ${intensity} ${post.mealTitle.toLowerCase()} session`;
+}
+
+function isExerciseEstimateError(message: string) {
+  return [
+    "Enter an exercise type.",
+    "Duration should be",
+    "Choose a valid intensity.",
+    "Could not estimate",
+    "Could not reach the Thryve server.",
+    "Your session expired."
+  ].some((text) => message.includes(text));
 }
 
 function Avatar({ name, photoUrl }: { name: string; photoUrl?: string }) {

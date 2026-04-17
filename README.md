@@ -60,6 +60,15 @@ VITE_API_BASE_URL=https://thryve-cffg.onrender.com
 
 Local development falls back to `http://localhost:8787` when `VITE_API_BASE_URL` is not set. Production builds do not fall back to localhost.
 
+For the Render backend, set a stable frontend origin and session secret:
+
+```bash
+CLIENT_ORIGIN=https://your-vercel-app.vercel.app
+SESSION_SECRET=your_long_random_secret_here
+```
+
+The backend also allows localhost and Vercel preview domains. A stable `SESSION_SECRET` keeps signed auth tokens valid across backend redeploys.
+
 You can also run each side separately:
 
 ```bash
@@ -159,7 +168,9 @@ Passwords are hashed with bcrypt before being saved, and login uses bcrypt compa
 
 Auth sessions are token-based and expire after 7 days. Expired sessions are removed from the local store and require the user to log in again. The frontend clears an expired token when the backend returns an auth failure.
 
-Migration note: earlier prototype users saved with the old SHA-256 password helper are not compatible with the bcrypt-only login path. Recreate those prototype accounts or reset their passwords in a future admin flow.
+New sessions use signed expiring bearer tokens, so token validation no longer depends only on the in-memory/local JSON session list. Set `SESSION_SECRET` in production so signed tokens remain valid across backend restarts and redeploys. If Render storage is reset and user records are lost, users still need to sign up again because the prototype does not yet use a production database.
+
+Migration note: earlier prototype users saved with the old SHA-256 password helper can log in once with the correct password and are migrated to bcrypt immediately. If Render storage was reset and the user record no longer exists, recreate the account or move to a production database.
 
 This is more realistic than the first prototype, but still uses local JSON storage. For production, replace it with a real database, HTTPS-only secure cookies or hardened bearer-token handling, rate limiting, email verification, and a proper password reset flow.
 

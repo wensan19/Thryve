@@ -6,10 +6,11 @@ import {
   deleteSession,
   findUserByEmail,
   findUserById,
+  persistUserChange,
   publicUser
 } from "../data/store.js";
 import { requireAuth } from "../middleware/auth.js";
-import { hashPassword, verifyPassword } from "../services/passwords.js";
+import { hashPassword, verifyLegacyPassword, verifyPassword } from "../services/passwords.js";
 
 export const authRouter = Router();
 
@@ -45,9 +46,22 @@ authRouter.post("/login", async (request, response) => {
 
   const user = await findUserByEmail(email.trim().toLowerCase());
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  if (!user) {
     response.status(401).json({ message: "Invalid email or password." });
     return;
+  }
+
+  const passwordMatches = await verifyPassword(password, user.passwordHash);
+  const legacyPasswordMatches = !passwordMatches && verifyLegacyPassword(password, user.passwordHash);
+
+  if (!passwordMatches && !legacyPasswordMatches) {
+    response.status(401).json({ message: "Invalid email or password." });
+    return;
+  }
+
+  if (legacyPasswordMatches) {
+    user.passwordHash = await hashPassword(password);
+    await persistUserChange();
   }
 
   const token = await createSession(user.id);

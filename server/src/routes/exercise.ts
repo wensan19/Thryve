@@ -15,18 +15,23 @@ exerciseRouter.get("/", async (request, response) => {
 });
 
 exerciseRouter.post("/estimate", async (request, response) => {
-  const user = await findUserById(request.userId!);
-  const estimateRequest = normalizeExerciseEstimateRequest(request.body, user?.profile.weightKg ?? 70);
-  const validationError = validateExerciseEstimateRequest(estimateRequest);
+  try {
+    const user = await findUserById(request.userId!);
+    const estimateRequest = normalizeExerciseEstimateRequest(request.body, user?.profile.weightKg ?? 70);
+    const validationError = validateExerciseEstimateRequest(estimateRequest);
 
-  if (validationError) {
-    response.status(400).json({ message: validationError });
-    return;
+    if (validationError) {
+      response.status(400).json({ message: validationError });
+      return;
+    }
+
+    const estimate = await estimateExerciseWithProvider(estimateRequest);
+
+    response.json(estimate);
+  } catch (error) {
+    console.error("[exercise-ai] estimate route failed", error instanceof Error ? error.message : error);
+    response.status(500).json({ message: "Could not estimate this exercise. Please try again." });
   }
-
-  const estimate = await estimateExerciseWithProvider(estimateRequest);
-
-  response.json(estimate);
 });
 
 exerciseRouter.post("/", async (request, response) => {
