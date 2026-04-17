@@ -14,8 +14,12 @@ const port = Number(process.env.PORT ?? 8787);
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: "8mb" }));
 
+app.get("/", (_request, response) => {
+  response.json({ message: "Thryve API is running" });
+});
+
 app.get("/api/health", (_request, response) => {
-  response.json({ ok: true, service: "thryve-api" });
+  response.json({ status: "ok" });
 });
 
 app.use("/api/auth", authRouter);
