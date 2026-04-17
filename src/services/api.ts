@@ -12,12 +12,14 @@ import type {
   ProfileSummary
 } from "../../shared/types";
 
+export const authExpiredEvent = "thryve:auth-expired";
+
 export class ApiClient {
   private baseUrl = getApiBaseUrl();
   private token = localStorage.getItem("thryve_token") ?? "";
 
   hasToken() {
-    return Boolean(this.token);
+    return Boolean(this.getStoredToken());
   }
 
   setToken(token: string) {
@@ -185,11 +187,17 @@ export class ApiClient {
       headers.set("Content-Type", "application/json");
     }
 
-    if (includeAuth && this.token) {
-      headers.set("Authorization", `Bearer ${this.token}`);
+    const token = this.getStoredToken();
+    if (includeAuth && token) {
+      headers.set("Authorization", `Bearer ${token}`);
     }
 
-    const response = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
+    } catch {
+      throw new Error("Could not reach the Thryve server. Please try again.");
+    }
 
     if (response.status === 204) {
       return undefined as T;
@@ -200,11 +208,20 @@ export class ApiClient {
     if (!response.ok) {
       if (response.status === 401 && includeAuth) {
         this.clearToken();
+        window.dispatchEvent(new CustomEvent(authExpiredEvent));
       }
       throw new Error(data.message ?? "Request failed");
     }
 
     return data as T;
+  }
+
+  private getStoredToken() {
+    const storedToken = localStorage.getItem("thryve_token") ?? "";
+    if (storedToken !== this.token) {
+      this.token = storedToken;
+    }
+    return this.token;
   }
 }
 

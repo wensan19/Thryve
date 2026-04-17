@@ -31,7 +31,7 @@ import {
   estimateMealCalories,
   getExerciseSuggestions
 } from "../shared/nutrition";
-import { ApiClient } from "./services/api";
+import { ApiClient, authExpiredEvent } from "./services/api";
 import "./styles.css";
 
 type Screen = "home" | "scan" | "edit" | "ate" | "exercise" | "profile" | "friends";
@@ -66,6 +66,7 @@ function App() {
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
   const [followingCount, setFollowingCount] = useState(0);
   const [appError, setAppError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
 
   useEffect(() => {
     if (!consentAccepted) {
@@ -87,10 +88,21 @@ function App() {
       })
       .catch(() => {
         api.clearToken();
-        setUser(null);
+        resetAuthState();
+        setAuthNotice("Your session expired. Please log in again.");
       })
       .finally(() => setBooting(false));
   }, [consentAccepted]);
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      resetAuthState();
+      setAuthNotice("Your session expired. Please log in again.");
+    }
+
+    window.addEventListener(authExpiredEvent, handleAuthExpired);
+    return () => window.removeEventListener(authExpiredEvent, handleAuthExpired);
+  }, []);
 
   const totals = useMemo(() => {
     const eaten = totalMealCaloriesForDay(mealLogs);
@@ -115,6 +127,8 @@ function App() {
 
   async function handleAuth(mode: "login" | "signup", name: string, email: string, password: string) {
     const auth = mode === "signup" ? await api.signup(name, email, password) : await api.login(email, password);
+    setAuthNotice("");
+    setAppError("");
     setUser(auth.user);
     setProfile(auth.profile);
     await loadAppData();
@@ -123,10 +137,18 @@ function App() {
 
   async function logout() {
     await api.logout().catch(() => undefined);
+    resetAuthState();
+    setAuthNotice("");
+  }
+
+  function resetAuthState() {
     setUser(null);
+    setProfile(initialProfile);
     setMealLogs([]);
     setExerciseLogs([]);
     setFeedPosts([]);
+    setFollowingCount(0);
+    setMealDraft(null);
   }
 
   async function scanImage(file: File | undefined, previewDataUrl: string) {
@@ -206,7 +228,7 @@ function App() {
   }
 
   if (!user) {
-    return <Shell><LoginScreen onSubmit={handleAuth} /></Shell>;
+    return <Shell><LoginScreen onSubmit={handleAuth} initialMessage={authNotice} /></Shell>;
   }
 
   return (
@@ -371,16 +393,25 @@ function ConsentGate({ onAccept }: { onAccept: () => void }) {
 }
 
 function LoginScreen({
-  onSubmit
+  onSubmit,
+  initialMessage = ""
 }: {
   onSubmit: (mode: "login" | "signup", name: string, email: string, password: string) => Promise<void>;
+  initialMessage?: string;
 }) {
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [name, setName] = useState("example");
   const [email, setEmail] = useState("example@example.com");
   const [password, setPassword] = useState("example1");
   const [status, setStatus] = useState<AsyncState>("idle");
-  const [message, setMessage] = useState("Use this test account or create your own.");
+  const [message, setMessage] = useState(initialMessage || "Use this test account or create your own.");
+
+  useEffect(() => {
+    if (initialMessage) {
+      setStatus("error");
+      setMessage(initialMessage);
+    }
+  }, [initialMessage]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -733,7 +764,13 @@ function ExerciseScreen({
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      api.estimateExercise({ type, minutes, intensity, bodyWeightKg: profile.weightKg }).then(setEstimate).catch(() => undefined);
+      api
+        .estimateExercise({ type, minutes, intensity, bodyWeightKg: profile.weightKg })
+        .then(setEstimate)
+        .catch((error) => {
+          setStatus("error");
+          setMessage(error instanceof Error ? error.message : "Could not estimate this exercise.");
+        });
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [intensity, minutes, profile.weightKg, type]);
