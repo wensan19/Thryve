@@ -40,7 +40,6 @@ type Screen = "home" | "scan" | "type" | "edit" | "ate" | "exercise" | "profile"
 type AsyncState = "idle" | "loading" | "success" | "error";
 
 const api = new ApiClient();
-const samplePhoto = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80";
 const thryveLogo = "/logo.jpeg";
 const maxUploadBytes = 8 * 1024 * 1024;
 const imageNormalizeBytes = 1.5 * 1024 * 1024;
@@ -519,7 +518,7 @@ function ScanScreen({
   onComplete: (meal: MealGuess) => void;
 }) {
   const [file, setFile] = useState<File>();
-  const [preview, setPreview] = useState(samplePhoto);
+  const [preview, setPreview] = useState(thryveLogo);
   const [status, setStatus] = useState<AsyncState>("idle");
   const [message, setMessage] = useState("Choose a photo or start with manual entry.");
 
@@ -558,8 +557,8 @@ function ScanScreen({
   return (
     <section className="screen">
       <Header title="Add meal" subtitle="Take a photo, upload one, or enter it yourself." />
-      <div className="photo-stage">
-        <img src={preview} alt="Food preview" />
+      <div className={`photo-stage ${file ? "" : "logo-stage"}`}>
+        <img src={preview} alt={file ? "Food preview" : "Thryve logo"} />
         <div className={`scan-badge ${status}`}><Sparkles size={16} /> {statusLabel(status)}</div>
       </div>
       <StatusLine status={status} text={message} />
