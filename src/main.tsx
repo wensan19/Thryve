@@ -9,6 +9,7 @@ import {
   Salad,
   Search,
   Sparkles,
+  Upload,
   User,
   Users
 } from "lucide-react";
@@ -545,11 +546,35 @@ function ScanScreen({
         <div className={`scan-badge ${status}`}><Sparkles size={16} /> {statusLabel(status)}</div>
       </div>
       <StatusLine status={status} text={message} />
-      <label className="upload-control">
-        <Camera size={22} />
-        <span>{file ? "Choose another photo" : "Take or upload photo"}</span>
-        <input type="file" accept="image/*" capture="environment" onChange={(event) => handleFile(event.target.files?.[0])} />
-      </label>
+      <div className="scan-actions">
+        <label className={`upload-control ${status === "loading" ? "disabled" : ""}`}>
+          <Camera size={22} />
+          <span>Take photo</span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            disabled={status === "loading"}
+            onChange={(event) => {
+              handleFile(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+        <label className={`upload-control library ${status === "loading" ? "disabled" : ""}`}>
+          <Upload size={22} />
+          <span>{file ? "Choose another" : "Choose from library"}</span>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={status === "loading"}
+            onChange={(event) => {
+              handleFile(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+      </div>
       <button className="secondary-button full" disabled={status === "loading"} onClick={() => onComplete(makeManualMeal())}>
         Enter meal manually
       </button>

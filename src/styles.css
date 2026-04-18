@@ -524,9 +524,26 @@ h3 {
 }
 
 .upload-control {
-  margin: 18px 0 12px;
   background: linear-gradient(135deg, #2f8b68, #8ddccc);
   color: #fff;
+}
+
+.scan-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 18px 0 12px;
+}
+
+.upload-control.library {
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--leaf-deep);
+  border: 1px solid rgba(91, 153, 132, 0.24);
+}
+
+.upload-control.disabled {
+  opacity: 0.64;
+  pointer-events: none;
 }
 
 .upload-control input {
