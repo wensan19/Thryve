@@ -128,8 +128,8 @@ function App() {
     setFollowingCount(feedSummary.followingCount);
   }
 
-  async function handleAuth(mode: "login" | "signup", name: string, email: string, password: string) {
-    const auth = mode === "signup" ? await api.signup(name, email, password) : await api.login(email, password);
+  async function handleAuth(mode: "login" | "signup", username: string, email: string, password: string) {
+    const auth = mode === "signup" ? await api.signup(username, email, password) : await api.login(username, password);
     setAuthNotice("");
     setAppError("");
     setUser(auth.user);
@@ -398,11 +398,11 @@ function LoginScreen({
   onSubmit,
   initialMessage = ""
 }: {
-  onSubmit: (mode: "login" | "signup", name: string, email: string, password: string) => Promise<void>;
+  onSubmit: (mode: "login" | "signup", username: string, email: string, password: string) => Promise<void>;
   initialMessage?: string;
 }) {
   const [mode, setMode] = useState<"login" | "signup">("signup");
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<AsyncState>("idle");
@@ -421,7 +421,7 @@ function LoginScreen({
     setMessage(mode === "signup" ? "Creating your account..." : "Signing you in...");
 
     try {
-      await onSubmit(mode, name, email, password);
+      await onSubmit(mode, username, email, password);
       setStatus("success");
     } catch (error) {
       setStatus("error");
@@ -442,8 +442,8 @@ function LoginScreen({
           <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button>
           <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>Sign up</button>
         </div>
-        {mode === "signup" && <FormField label="Name" value={name} onChange={setName} placeholder="example" />}
-        <FormField label="Email" value={email} onChange={setEmail} type="email" placeholder="example@example.com" />
+        <FormField label="Username" value={username} onChange={setUsername} placeholder="example" />
+        {mode === "signup" && <FormField label="Email (optional)" value={email} onChange={setEmail} type="email" placeholder="example@example.com" />}
         <FormField label="Password" value={password} onChange={setPassword} type="password" placeholder="example1" />
         <button className="primary-button" disabled={status === "loading"}>
           {status === "loading" ? "Please wait..." : mode === "signup" ? "Create account" : "Login"}
@@ -1264,7 +1264,7 @@ function FriendsScreen({
               <Avatar name={friend.name} photoUrl={friend.photoUrl} />
               <div>
                 <strong>{friend.name}</strong>
-                <span>{friend.email}</span>
+                <span>{friend.email || (friend.username ? `@${friend.username}` : "Thryve member")}</span>
               </div>
               <button
                 disabled={followStatus[friend.id] === "loading"}

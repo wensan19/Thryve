@@ -125,7 +125,8 @@ export interface FeedPost {
 export interface FriendSearchResult {
   id: string;
   name: string;
-  email: string;
+  username?: string;
+  email?: string;
   photoUrl?: string;
   goal?: string;
   isFollowing: boolean;
@@ -147,8 +148,9 @@ export interface FeedComment {
 
 export interface AuthUser {
   id: string;
+  username: string;
   name: string;
-  email: string;
+  email?: string;
 }
 
 export interface AuthResponse {

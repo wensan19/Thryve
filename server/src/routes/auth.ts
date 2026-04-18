@@ -6,6 +6,7 @@ import {
   deleteSession,
   findUserByEmail,
   findUserById,
+  findUserByUsername,
   persistUserChange,
   publicUser
 } from "../data/store.js";
@@ -15,39 +16,45 @@ import { hashPassword, verifyLegacyPassword, verifyPassword } from "../services/
 export const authRouter = Router();
 
 authRouter.post("/signup", async (request, response) => {
-  const { name, email, password } = request.body ?? {};
-  const error = validateSignupInput(name, email, password);
+  const { username, email = "", password } = request.body ?? {};
+  const error = validateSignupInput(username, email, password);
 
   if (error) {
     response.status(400).json({ message: error });
     return;
   }
 
-  if (await findUserByEmail(email)) {
+  if (await findUserByUsername(username)) {
+    response.status(409).json({ message: "Username is already taken." });
+    return;
+  }
+
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (normalizedEmail && await findUserByEmail(normalizedEmail)) {
     response.status(409).json({ message: "An account with this email already exists." });
     return;
   }
 
   const passwordHash = await hashPassword(password);
-  const user = await createUser(name.trim(), email.trim().toLowerCase(), passwordHash);
+  const user = await createUser(username, normalizedEmail, passwordHash);
   const token = await createSession(user.id);
   const body: AuthResponse = { token, user: publicUser(user), profile: user.profile };
   response.status(201).json(body);
 });
 
 authRouter.post("/login", async (request, response) => {
-  const { email, password } = request.body ?? {};
-  const error = validateLoginInput(email, password);
+  const { username, password } = request.body ?? {};
+  const error = validateLoginInput(username, password);
 
   if (error) {
     response.status(400).json({ message: error });
     return;
   }
 
-  const user = await findUserByEmail(email.trim().toLowerCase());
+  const user = await findUserByUsername(username);
 
   if (!user) {
-    response.status(401).json({ message: "Invalid email or password." });
+    response.status(401).json({ message: "Invalid username or password." });
     return;
   }
 
@@ -55,7 +62,7 @@ authRouter.post("/login", async (request, response) => {
   const legacyPasswordMatches = !passwordMatches && verifyLegacyPassword(password, user.passwordHash);
 
   if (!passwordMatches && !legacyPasswordMatches) {
-    response.status(401).json({ message: "Invalid email or password." });
+    response.status(401).json({ message: "Invalid username or password." });
     return;
   }
 
@@ -91,17 +98,22 @@ authRouter.post("/logout", requireAuth, async (request, response) => {
   response.status(204).end();
 });
 
-function validateSignupInput(name: unknown, email: unknown, password: unknown) {
-  if (typeof name !== "string" || name.trim().length < 2) {
-    return "Enter a display name.";
+function validateSignupInput(username: unknown, email: unknown, password: unknown) {
+  const usernameError = validateUsername(username);
+  if (usernameError) {
+    return usernameError;
   }
 
-  return validateEmailAndPassword(email, password);
+  if (typeof email === "string" && email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    return "Enter a valid email.";
+  }
+
+  return validatePassword(password);
 }
 
-function validateLoginInput(email: unknown, password: unknown) {
-  if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return "Enter a valid email.";
+function validateLoginInput(username: unknown, password: unknown) {
+  if (typeof username !== "string" || !username.trim()) {
+    return "Enter your username.";
   }
 
   if (typeof password !== "string" || password.length < 1) {
@@ -111,11 +123,19 @@ function validateLoginInput(email: unknown, password: unknown) {
   return "";
 }
 
-function validateEmailAndPassword(email: unknown, password: unknown) {
-  if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return "Enter a valid email.";
+function validateUsername(username: unknown) {
+  if (typeof username !== "string" || !username.trim()) {
+    return "Enter a username.";
   }
 
+  if (!/^[a-z0-9._-]{2,30}$/i.test(username.trim())) {
+    return "Use 2-30 letters, numbers, dots, dashes, or underscores.";
+  }
+
+  return "";
+}
+
+function validatePassword(password: unknown) {
   if (typeof password !== "string" || password.length < 8) {
     return "Password must be at least 8 characters.";
   }

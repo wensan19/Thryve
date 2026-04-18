@@ -10,7 +10,7 @@ Thryve is a website-first food tracking prototype designed to prove the core pro
 
 ## What Works Now
 
-- Signup and login with bcrypt password hashing, stronger validation, and expiring token sessions.
+- Signup and username/password login with bcrypt password hashing, stronger validation, and expiring token sessions.
 - The Home page includes the Thryve logo in the top-left brand area.
 - Versioned consent / terms gate before users can enter the app.
 - Logged-in state persists in the browser with `localStorage`.
@@ -36,7 +36,7 @@ Thryve is a website-first food tracking prototype designed to prove the core pro
 - Custom exercises such as curls, pushups, sit-ups, planks, squats, lunges, jumping jacks, burpees, presses, and deadlifts map to more relevant estimates.
 - Meal uploads reject images over 8 MB and the frontend compresses large images before analysis when possible.
 - Nature-wellness visual direction with soft sage, aqua, pearl, and translucent bubble-style panels.
-- Friend search works from the Friends page and searches existing users by display name or email.
+- Friend search works from the Friends page and searches existing users by username, display name, or email.
 - Follow and unfollow relationships are stored per user.
 - Followed users' saved meals and workouts appear together in the social feed, newest first.
 - Feed cards show the author's profile picture or fallback avatar, plus meal/workout images when available.
@@ -184,7 +184,7 @@ These values are prototype wellness estimates only and are not medical or profes
 
 ## Auth And Persistence
 
-Passwords are hashed with bcrypt before being saved, and login uses bcrypt comparison. Signup validates display name, email format, and password strength. Login returns a generic invalid-credentials message so it does not reveal whether the email or password was wrong.
+Passwords are hashed with bcrypt before being saved, and login uses bcrypt comparison. Login now uses username and password instead of email and password. Signup validates a unique username, optional email format when email is provided, and password strength. Login returns a generic invalid-credentials message so it does not reveal whether the username or password was wrong.
 
 Auth sessions are token-based and expire after 7 days. Expired sessions are removed from the local store and require the user to log in again. The frontend clears an expired token when the backend returns an auth failure.
 
@@ -192,7 +192,7 @@ New sessions use signed expiring bearer tokens, so token validation no longer de
 
 The frontend checks the stored token shape and expiry before calling `/api/auth/me`. Clearly stale prototype tokens are cleared locally and treated as signed out, which avoids unnecessary startup auth noise. A backend `401` can still happen if a signed token was issued with a different `SESSION_SECRET` or its user record no longer exists; in that case the app clears the token and asks the user to log in again.
 
-Migration note: earlier prototype users saved with the old SHA-256 password helper can log in once with the correct password and are migrated to bcrypt immediately. If Render storage was reset and the user record no longer exists, recreate the account or move to a production database.
+Migration note: earlier prototype users saved without a username are backfilled on startup. Thryve first tries the email local part, such as `maya` from `maya@example.com`, then falls back to a normalized display name with a numeric suffix if needed. Earlier users saved with the old SHA-256 password helper can log in once with the correct password and are migrated to bcrypt immediately. If Render storage was reset and the user record no longer exists, recreate the account or move to a production database.
 
 This is more realistic than the first prototype, but still uses local JSON storage. For production, replace it with a real database, HTTPS-only secure cookies or hardened bearer-token handling, rate limiting, email verification, and a proper password reset flow.
 

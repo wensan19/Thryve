@@ -74,9 +74,28 @@ export async function getDatabase() {
     database = JSON.parse(await readFile(databasePath, "utf8")) as DatabaseShape;
     database.socialReactions ??= [];
     database.socialComments ??= [];
+    let migratedUsers = false;
+    const claimedUsernames = new Set<string>();
     database.users.forEach((user) => {
+      if (!user.username) {
+        user.username = createLegacyUsername(user, claimedUsernames);
+        migratedUsers = true;
+      } else {
+        const normalizedUsername = normalizeUsername(user.username);
+        if (user.username !== normalizedUsername) {
+          user.username = normalizedUsername;
+          migratedUsers = true;
+        }
+        if (claimedUsernames.has(user.username)) {
+          user.username = createUniqueUsername(user.username, claimedUsernames);
+          migratedUsers = true;
+        } else {
+          claimedUsernames.add(user.username);
+        }
+      }
       user.followingUserIds ??= [];
       user.profile.targetWeightKg ??= user.profile.weightKg;
+      user.profile.email ??= user.email;
     });
     const sessionsBeforeCleanup = database.sessions?.length ?? 0;
     let addedExpiryToLegacySession = false;
@@ -87,7 +106,7 @@ export async function getDatabase() {
       }
       return new Date(session.expiresAt).getTime() > Date.now();
     });
-    if (addedExpiryToLegacySession || database.sessions.length !== sessionsBeforeCleanup) {
+    if (migratedUsers || addedExpiryToLegacySession || database.sessions.length !== sessionsBeforeCleanup) {
       await saveDatabase();
     }
   } catch {
@@ -109,7 +128,13 @@ export async function saveDatabase() {
 
 export async function findUserByEmail(email: string) {
   const db = await getDatabase();
-  return db.users.find((user) => user.email.toLowerCase() === email.toLowerCase());
+  return db.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+}
+
+export async function findUserByUsername(username: string) {
+  const db = await getDatabase();
+  const normalized = normalizeUsername(username);
+  return db.users.find((user) => user.username === normalized);
 }
 
 export async function findUserById(userId: string) {
@@ -117,14 +142,16 @@ export async function findUserById(userId: string) {
   return db.users.find((user) => user.id === userId);
 }
 
-export async function createUser(name: string, email: string, passwordHash: string) {
+export async function createUser(username: string, email: string, passwordHash: string) {
   const db = await getDatabase();
+  const normalizedUsername = normalizeUsername(username);
   const user: StoredUser = {
     id: crypto.randomUUID(),
-    name,
+    username: normalizedUsername,
+    name: normalizedUsername,
     email,
     passwordHash,
-    profile: createDefaultProfile(name, email),
+    profile: createDefaultProfile(normalizedUsername, email),
     meals: [],
     exercises: [],
     followingUserIds: []
@@ -229,7 +256,7 @@ function constantTimeEqual(left: string, right: string) {
 }
 
 export function publicUser(user: StoredUser): AuthUser {
-  return { id: user.id, name: user.name, email: user.email };
+  return { id: user.id, username: user.username, name: user.name, email: user.email || undefined };
 }
 
 export async function getFeedPosts() {
@@ -249,14 +276,16 @@ export async function searchUsers(query: string, currentUserId: string) {
   return db.users
     .filter((user) => user.id !== currentUserId)
     .filter((user) =>
+      user.username.toLowerCase().includes(normalized) ||
       user.name.toLowerCase().includes(normalized) ||
-      user.email.toLowerCase().includes(normalized) ||
+      user.email?.toLowerCase().includes(normalized) ||
       user.profile.name.toLowerCase().includes(normalized)
     )
     .slice(0, 8)
     .map((user) => ({
       id: user.id,
       name: user.profile.name || user.name,
+      username: user.username,
       email: user.email,
       photoUrl: user.profile.photoUrl,
       goal: user.profile.goal,
@@ -481,4 +510,27 @@ function createDefaultProfile(name: string, email: string): ProfileSummary {
     targetWeightKg: 56,
     calorieTarget: 1850
   };
+}
+
+function normalizeUsername(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function createLegacyUsername(user: StoredUser, claimedUsernames: Set<string>) {
+  const emailLocalPart = user.email?.split("@")[0] ?? "";
+  const preferred = normalizeUsername(emailLocalPart) || normalizeUsername(user.name) || "user";
+  return createUniqueUsername(preferred, claimedUsernames);
+}
+
+function createUniqueUsername(preferred: string, claimedUsernames: Set<string>) {
+  let username = preferred || "user";
+  let suffix = 2;
+
+  while (claimedUsernames.has(username)) {
+    username = `${preferred || "user"}-${suffix}`;
+    suffix += 1;
+  }
+
+  claimedUsernames.add(username);
+  return username;
 }

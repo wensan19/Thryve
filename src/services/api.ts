@@ -32,19 +32,19 @@ export class ApiClient {
     localStorage.removeItem("thryve_token");
   }
 
-  async signup(name: string, email: string, password: string): Promise<AuthResponse> {
+  async signup(username: string, email: string, password: string): Promise<AuthResponse> {
     const auth = await this.request<AuthResponse>("/api/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ username, email, password })
     }, false);
     this.setToken(auth.token);
     return auth;
   }
 
-  async login(email: string, password: string): Promise<AuthResponse> {
+  async login(username: string, password: string): Promise<AuthResponse> {
     const auth = await this.request<AuthResponse>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ username, password })
     }, false);
     this.setToken(auth.token);
     return auth;
