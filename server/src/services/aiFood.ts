@@ -7,6 +7,12 @@ import { analyzeFoodImageWithGemini } from "./realFoodVision.js";
 interface GuessInput {
   file?: Express.Multer.File;
   previewDataUrl?: string;
+  originalUpload?: {
+    name?: string;
+    mimetype?: string;
+    size: number;
+    userAgent: string;
+  };
 }
 
 interface FoodAiProvider {
@@ -28,16 +34,17 @@ const geminiFoodProvider: FoodAiProvider = {
 
 export async function guessFoodFromImage(input: GuessInput): Promise<MealGuess> {
   const provider = selectFoodProvider();
+  logFoodScanRequest(input, provider);
 
   if (provider === "gemini") {
     try {
-      console.log("[food-ai] using Gemini image provider");
+      console.log("[food-ai] provider=gemini status=starting");
       return await geminiFoodProvider.analyze(input);
     } catch (error) {
-      console.error("[food-ai] Gemini provider failed; falling back to mock provider", error);
+      console.error("[food-ai] provider=gemini status=failed fallback=mock", error);
     }
   } else {
-    console.log("[food-ai] using mock provider");
+    console.log("[food-ai] provider=mock status=starting reason=gemini-not-configured");
   }
 
   return mockFoodAiProvider.analyze(input);
@@ -68,31 +75,35 @@ async function analyzeWithMockProvider({ file, previewDataUrl }: GuessInput): Pr
   const fileName = file?.originalname ?? "sample-photo";
   const fileSize = file?.size ?? 0;
   const match = chooseTemplate(fileName);
-  const items = match.template.items.map((item) => ({
+  const items = match.items.map((item) => ({
     ...item,
     id: crypto.randomUUID(),
     confidence: Number(Math.max(0.34, item.confidence * match.confidenceMultiplier).toFixed(2))
   }));
 
   console.log(
-    `[mock-ai] analysis requested id=${requestId} file="${fileName}" bytes=${fileSize} matched="${match.template.title}" category="${match.template.category}" score=${match.score.toFixed(2)} mimetype=${file?.mimetype ?? "none"}`
+    `[food-ai] provider=mock status=complete requestId=${requestId} file="${fileName}" bytes=${fileSize} mimetype=${file?.mimetype ?? "none"} matched="${match.title}" category="${match.category}" score=${match.score.toFixed(2)} fallback=${match.isFallback}`
   );
 
   return {
     id: requestId,
     photoUrl:
       previewDataUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80",
-    title: match.template.title,
+    title: match.title,
     items,
-    calories: estimateMealCalories(items, match.template.sweetness),
-    sweetness: match.template.sweetness,
-    spiciness: match.template.spiciness,
-    saltiness: match.template.saltiness,
-    notes: "Mock AI estimate from a structured food template database. Review and edit before saving.",
+    calories: estimateMealCalories(items, match.sweetness),
+    sweetness: match.sweetness,
+    spiciness: match.spiciness,
+    saltiness: match.saltiness,
+    notes: match.isFallback
+      ? "Low-confidence fallback. The image could not be confidently matched, so review and edit before saving."
+      : "Mock AI estimate from a structured food template database. Review and edit before saving.",
     analysis: {
       provider: "mock",
       status: "complete",
-      summary: `${match.template.summary} Matched ${match.template.category.toLowerCase()} template from filename hints; ingredients are AI-estimated and editable.`,
+      summary: match.isFallback
+        ? "Low confidence result — please review before saving. Gemini was unavailable or failed, and the local filename matcher did not find a reliable food hint."
+        : `${match.summary} Matched ${match.category.toLowerCase()} template from filename hints; ingredients are AI-estimated and editable.`,
       requestId
     }
   };
@@ -106,11 +117,55 @@ function chooseTemplate(fileName: string) {
   const best = ranked[0];
 
   if (best && best.score >= 0.48) {
-    return { ...best, confidenceMultiplier: Math.min(1.08, 0.82 + best.score * 0.24) };
+    return {
+      title: best.template.title,
+      category: best.template.category,
+      summary: best.template.summary,
+      items: best.template.items,
+      sweetness: best.template.sweetness,
+      spiciness: best.template.spiciness,
+      saltiness: best.template.saltiness,
+      score: best.score,
+      confidenceMultiplier: Math.min(1.08, 0.82 + best.score * 0.24),
+      isFallback: false
+    };
   }
 
-  const fallback = mealTemplates.find((template) => template.title === "Chicken rice") ?? mealTemplates[0];
-  return { template: fallback, score: 0.35, confidenceMultiplier: 0.72 };
+  return {
+    title: "Review food photo",
+    category: "Unclear meal",
+    summary: "The uploaded image could not be matched confidently.",
+    items: [{
+      name: "Visible meal portion",
+      quantity: 1,
+      unit: "serving" as const,
+      calories: 450,
+      confidence: 0.32
+    }],
+    sweetness: 0,
+    spiciness: 0,
+    saltiness: 20,
+    score: 0.12,
+    confidenceMultiplier: 1,
+    isFallback: true
+  };
+}
+
+function logFoodScanRequest(input: GuessInput, provider: "gemini" | "mock") {
+  const file = input.file;
+  const original = input.originalUpload;
+  const looksMobile = /iphone|ipad|android|mobile/i.test(original?.userAgent ?? "");
+  const normalizedByClient = Boolean(
+    file &&
+    original &&
+    (file.mimetype !== original.mimetype || file.size !== original.size || file.originalname !== original.name)
+  );
+
+  console.log(
+    `[food-ai] request provider=${provider} uploadName="${file?.originalname ?? "none"}" uploadMime=${file?.mimetype ?? "none"} uploadBytes=${file?.size ?? 0} ` +
+    `originalName="${original?.name ?? "unknown"}" originalMime=${original?.mimetype ?? "unknown"} originalBytes=${original?.size ?? 0} ` +
+    `normalizedByClient=${normalizedByClient} client=${looksMobile ? "mobile" : "desktop-or-unknown"} userAgent="${(original?.userAgent ?? "").slice(0, 120)}"`
+  );
 }
 
 function scoreTemplate(hints: string[], template: MealTemplate) {

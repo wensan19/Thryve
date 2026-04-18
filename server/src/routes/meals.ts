@@ -10,7 +10,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_request, file, callback) => {
-    if (!file.mimetype.startsWith("image/")) {
+    if (!isAcceptedImageUpload(file)) {
       callback(new Error("Choose an image file."));
       return;
     }
@@ -34,7 +34,13 @@ mealRouter.post("/guess", (request, response, next) => {
   try {
     const guess = await guessFoodFromImage({
       file: request.file,
-      previewDataUrl: typeof request.body.previewDataUrl === "string" ? request.body.previewDataUrl : undefined
+      previewDataUrl: typeof request.body.previewDataUrl === "string" ? request.body.previewDataUrl : undefined,
+      originalUpload: {
+        name: typeof request.body.originalName === "string" ? request.body.originalName : request.file?.originalname,
+        mimetype: typeof request.body.originalType === "string" ? request.body.originalType : request.file?.mimetype,
+        size: Number(request.body.originalSize) || request.file?.size || 0,
+        userAgent: request.get("user-agent") || ""
+      }
     });
     response.json(guess);
   } catch (error) {
@@ -150,4 +156,12 @@ function validateMeal(meal: Partial<MealGuess>) {
   }
 
   return "";
+}
+
+function isAcceptedImageUpload(file: Express.Multer.File) {
+  if (file.mimetype.startsWith("image/")) {
+    return true;
+  }
+
+  return /\.(heic|heif|jpg|jpeg|png|webp)$/i.test(file.originalname);
 }

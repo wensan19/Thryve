@@ -104,7 +104,7 @@ Consent is stored in browser `localStorage` with a consent version key. Updating
 
 Food detection is provider-based in `server/src/services/aiFood.ts`. If `FOOD_VISION_PROVIDER=gemini` and `GEMINI_API_KEY` are configured, the backend sends the uploaded image content to Gemini from `server/src/services/realFoodVision.ts` and maps the structured response into Thryve's editable meal review shape.
 
-If Gemini is not configured or the Gemini request fails, Thryve falls back to the mock food template provider. The mock provider accepts the uploaded image, logs each analysis request in the backend console, and returns structured recipe-style estimates based on filename and hint matching. Results include a main food name, editable ingredient rows, practical units, confidence values, flavor levels, ingredient-based calories, and a request ID for development checks.
+If Gemini is not configured or the Gemini request fails, Thryve falls back to the mock food template provider. The mock provider accepts the uploaded image, logs each analysis request in the backend console, and returns structured recipe-style estimates based on filename and hint matching. If the filename has no reliable food hint, such as a generic iPhone `IMG_1234.HEIC` name, the fallback now returns a low-confidence editable "Review food photo" result instead of a random common meal. Results include a main food name, editable ingredient rows, practical units, confidence values, flavor levels, ingredient-based calories, and a request ID for development checks.
 
 The structured mock food database lives in `server/src/services/foodTemplates.ts`. It covers rice meals, noodle meals, breakfast foods, drinks, desserts, snacks, fast food, and common Asian / Singapore-style meals such as chicken rice, nasi lemak, laksa, char kway teow, mee goreng, fishball noodles, kaya toast, roti prata, sushi, rice bowls, fried rice, ramen, pasta, salad bowls, pizza, burgers, fried chicken, bubble tea, smoothies, cake, ice cream, and snack plates.
 
@@ -129,11 +129,15 @@ The API key is read by the Express backend only. The React frontend never receiv
 
 To confirm which provider is active, watch the backend console:
 
-- Gemini path: `[food-ai] using Gemini image provider`
-- Mock fallback path: `[food-ai] using mock provider`
-- Gemini failure fallback: `[food-ai] Gemini provider failed; falling back to mock provider`
+- Request metadata: `[food-ai] request provider=... uploadMime=... uploadBytes=... originalMime=... originalBytes=... normalizedByClient=true|false client=mobile|desktop-or-unknown`
+- Gemini path: `[food-ai] provider=gemini status=starting`
+- Gemini image payload: `[food-ai] provider=gemini requestId=... imageSource=upload|normalized-preview normalized=true|false ...`
+- Gemini success: `[food-ai] provider=gemini status=complete requestId=... mainFood="..." confidence=...`
+- Mock fallback path: `[food-ai] provider=mock status=starting reason=gemini-not-configured`
+- Gemini failure fallback: `[food-ai] provider=gemini status=failed fallback=mock`
+- Mock result: `[food-ai] provider=mock status=complete ... matched="..." fallback=true|false`
 
-The Gemini provider uses the uploaded image content and requests structured JSON that maps to the existing review fields: main food, ingredients, quantity, unit, calories per unit, estimated calories, confidence, and flavor sliders. The provider can later be replaced by another vision service as long as it returns the same `MealGuess` shape.
+The Gemini provider uses the uploaded image content and requests structured JSON that maps to the existing review fields: main food, ingredients, quantity, unit, calories per unit, estimated calories, confidence, and flavor sliders. The prompt tells Gemini to separate the main dish from visible ingredients, handle mixed meals, rice/noodle dishes, drinks, desserts, and snacks, and return low confidence instead of forcing a common-food guess when the image is unclear. The provider can later be replaced by another vision service as long as it returns the same `MealGuess` shape.
 
 OpenAI variables such as `OPENAI_API_KEY` and `OPENAI_FOOD_MODEL` are no longer used by the active food vision path.
 
@@ -157,7 +161,7 @@ The Exercise page supports weighted workout logging with weight used, kg/lb unit
 
 The meal editor keeps AI output fully editable. When a user renames the main food or an ingredient, Thryve checks a shared nutrition lookup and updates calories, units, and calorie-per-unit values when it recognizes the corrected food. Unknown foods keep the user's current calorie value so the meal can still be saved and adjusted manually.
 
-Meal image uploads are limited to 8 MB on both frontend and backend. The frontend attempts to resize/compress images larger than roughly 1.5 MB before sending them to the backend, while preserving enough quality for analysis. Oversized or non-image files return user-friendly errors.
+Meal image uploads are limited to 8 MB on both frontend and backend. The frontend attempts to normalize HEIC/HEIF, unknown image types, and images larger than roughly 1.5 MB through the browser canvas before sending them to the backend. This usually converts iPhone camera uploads into oriented JPEGs while preserving enough quality for analysis. The backend logs both the original client file metadata and the uploaded payload metadata, then sends Gemini either the upload or the normalized preview payload. If the browser cannot decode a HEIC/HEIF image for normalization, the original image is still sent when accepted by the upload filter, and the backend logs `normalized=false`.
 
 ## Profile Pictures
 

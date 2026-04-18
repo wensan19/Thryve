@@ -41,6 +41,7 @@ type AsyncState = "idle" | "loading" | "success" | "error";
 const api = new ApiClient();
 const samplePhoto = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80";
 const maxUploadBytes = 8 * 1024 * 1024;
+const imageNormalizeBytes = 1.5 * 1024 * 1024;
 const consentVersion = "2026-04-17";
 const consentStorageKey = "thryve.consent.version";
 
@@ -153,8 +154,8 @@ function App() {
     setMealDraft(null);
   }
 
-  async function scanImage(file: File | undefined, previewDataUrl: string) {
-    const result = await api.guessMeal(file, previewDataUrl);
+  async function scanImage(file: File | undefined, previewDataUrl: string, originalFile?: File) {
+    const result = await api.guessMeal(file, previewDataUrl, originalFile);
     setMealDraft(result);
     return result;
   }
@@ -496,7 +497,7 @@ function ScanScreen({
   onAnalyze,
   onComplete
 }: {
-  onAnalyze: (file: File | undefined, previewDataUrl: string) => Promise<MealGuess>;
+  onAnalyze: (file: File | undefined, previewDataUrl: string, originalFile?: File) => Promise<MealGuess>;
   onComplete: (meal: MealGuess) => void;
 }) {
   const [file, setFile] = useState<File>();
@@ -506,7 +507,7 @@ function ScanScreen({
 
   async function handleFile(nextFile?: File) {
     if (!nextFile) return;
-    if (!nextFile.type.startsWith("image/")) {
+    if (!isLikelyImageFile(nextFile)) {
       setStatus("error");
       setMessage("Choose an image file.");
       return;
@@ -527,7 +528,7 @@ function ScanScreen({
     setMessage("Reading the meal estimate...");
 
     try {
-      const meal = await onAnalyze(preparedFile, dataUrl);
+      const meal = await onAnalyze(preparedFile, dataUrl, nextFile);
       setStatus("success");
       onComplete(meal);
     } catch (error) {
@@ -595,6 +596,7 @@ function EditMealScreen({
   );
   const totalToday = persistedToday + meal.calories;
   const remainingToday = calorieTarget - totalToday;
+  const lowConfidence = getMealConfidence(meal) < 0.5 || /low confidence/i.test(meal.analysis.summary);
 
   async function save() {
     if (meal.items.some((item) => !item.name.trim() || item.quantity <= 0)) {
@@ -628,6 +630,7 @@ function EditMealScreen({
         <span>Total today: {totalToday} cal</span>
         <strong>{Math.max(remainingToday, 0)} cal remaining</strong>
       </div>
+      {lowConfidence && <StatusLine status="error" text="Low confidence result — please review before saving" />}
       <div className="section-heading">
         <h3>Ingredients</h3>
         <button onClick={() => onChange(withCalories({ ...meal, items: [...meal.items, makeIngredient()] }))}>Add ingredient</button>
@@ -1457,6 +1460,14 @@ function statusLabel(status: AsyncState) {
   return { idle: "Ready", loading: "Reading", success: "Done", error: "Retry" }[status];
 }
 
+function getMealConfidence(meal: MealGuess | MealLog) {
+  if (!meal.items.length) {
+    return 0;
+  }
+
+  return meal.items.reduce((sum, item) => sum + item.confidence, 0) / meal.items.length;
+}
+
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -1467,7 +1478,7 @@ function fileToDataUrl(file: File) {
 }
 
 async function prepareImageForUpload(file: File) {
-  if (file.size <= 1.5 * 1024 * 1024) {
+  if (!shouldNormalizeImage(file)) {
     return file;
   }
 
@@ -1476,6 +1487,18 @@ async function prepareImageForUpload(file: File) {
   } catch {
     return file;
   }
+}
+
+function shouldNormalizeImage(file: File) {
+  return file.size > imageNormalizeBytes || isHeicImage(file) || !["image/jpeg", "image/png", "image/webp"].includes(file.type.toLowerCase());
+}
+
+function isLikelyImageFile(file: File) {
+  return file.type.startsWith("image/") || /\.(heic|heif|jpg|jpeg|png|webp)$/i.test(file.name);
+}
+
+function isHeicImage(file: File) {
+  return /image\/hei[cf]/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
 }
 
 function resizeImage(file: File, maxDimension: number, quality: number) {

@@ -61,10 +61,13 @@ export class ApiClient {
     this.clearToken();
   }
 
-  async guessMeal(file: File | undefined, previewDataUrl: string): Promise<MealGuess> {
+  async guessMeal(file: File | undefined, previewDataUrl: string, originalFile?: File): Promise<MealGuess> {
     const formData = new FormData();
     if (file) {
       formData.append("photo", file);
+      formData.append("originalName", originalFile?.name ?? file.name);
+      formData.append("originalType", originalFile?.type || file.type || "unknown");
+      formData.append("originalSize", String(originalFile?.size ?? file.size));
     }
     formData.append("previewDataUrl", previewDataUrl);
 
