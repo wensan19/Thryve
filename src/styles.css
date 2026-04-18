@@ -207,7 +207,8 @@ h3 {
 
 .auth-panel input,
 .simple-form input,
-.simple-form select {
+.simple-form select,
+.simple-form textarea {
   width: 100%;
   min-height: 50px;
   border: 1px solid var(--line);
@@ -221,9 +222,17 @@ h3 {
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
+.simple-form textarea {
+  min-height: 116px;
+  resize: vertical;
+  padding: 14px;
+  line-height: 1.45;
+}
+
 .auth-panel input:focus,
 .simple-form input:focus,
 .simple-form select:focus,
+.simple-form textarea:focus,
 .title-input:focus,
 .food-editor input:focus {
   border-color: rgba(72, 164, 132, 0.44);
@@ -454,9 +463,13 @@ h3 {
 
 .scan-cta.compact {
   min-height: 48px;
-  margin: 16px 0 8px;
+  margin: 16px 0 10px;
   justify-content: center;
   box-shadow: 0 12px 24px rgba(47, 139, 104, 0.18);
+}
+
+.type-meal-button {
+  margin-bottom: 8px;
 }
 
 .section-heading {
@@ -493,6 +506,15 @@ h3 {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.logo-stage {
+  background: linear-gradient(145deg, rgba(232, 247, 241, 0.92), rgba(221, 245, 244, 0.92));
+}
+
+.logo-stage img {
+  object-fit: contain;
+  padding: 28px;
 }
 
 .scan-badge {

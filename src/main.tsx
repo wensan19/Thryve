@@ -36,11 +36,12 @@ import {
 import { ApiClient, authExpiredEvent } from "./services/api";
 import "./styles.css";
 
-type Screen = "home" | "scan" | "edit" | "ate" | "exercise" | "profile" | "friends";
+type Screen = "home" | "scan" | "type" | "edit" | "ate" | "exercise" | "profile" | "friends";
 type AsyncState = "idle" | "loading" | "success" | "error";
 
 const api = new ApiClient();
 const samplePhoto = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80";
+const thryveLogo = "/logo.jpeg";
 const maxUploadBytes = 8 * 1024 * 1024;
 const imageNormalizeBytes = 1.5 * 1024 * 1024;
 const consentVersion = "2026-04-17";
@@ -161,6 +162,12 @@ function App() {
     return result;
   }
 
+  async function typeMeal(text: string) {
+    const result = await api.guessMealFromText(text);
+    setMealDraft(result);
+    return result;
+  }
+
   async function saveMeal(meal: MealGuess | MealLog) {
     const saved = "eatenAt" in meal ? await api.updateMeal(meal) : await api.saveMeal(meal);
     setMealLogs((current) => {
@@ -249,6 +256,15 @@ function App() {
           }}
         />
       )}
+      {screen === "type" && (
+        <TypeMealScreen
+          onAnalyze={typeMeal}
+          onComplete={(meal) => {
+            setMealDraft(meal);
+            setScreen("edit");
+          }}
+        />
+      )}
       {screen === "edit" && mealDraft && (
         <EditMealScreen
           meal={mealDraft}
@@ -262,6 +278,7 @@ function App() {
         <WhatIAteScreen
           mealLogs={mealLogs}
           onScan={() => setScreen("scan")}
+          onType={() => setScreen("type")}
           onEdit={(meal) => {
             setMealDraft(meal);
             setScreen("edit");
@@ -582,6 +599,65 @@ function ScanScreen({
   );
 }
 
+function TypeMealScreen({
+  onAnalyze,
+  onComplete
+}: {
+  onAnalyze: (text: string) => Promise<MealGuess>;
+  onComplete: (meal: MealGuess) => void;
+}) {
+  const [mealText, setMealText] = useState("");
+  const [status, setStatus] = useState<AsyncState>("idle");
+  const [message, setMessage] = useState("Type what you ate, then review the estimate.");
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    const text = mealText.trim();
+
+    if (text.length < 2) {
+      setStatus("error");
+      setMessage("Type a meal first.");
+      return;
+    }
+
+    setStatus("loading");
+    setMessage("Estimating your meal...");
+
+    try {
+      const meal = await onAnalyze(text);
+      setStatus("success");
+      onComplete(meal);
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Could not estimate this meal.");
+    }
+  }
+
+  return (
+    <section className="screen">
+      <Header title="Type in a meal" subtitle="Describe it simply and adjust the estimate next." />
+      <div className="photo-stage logo-stage">
+        <img src={thryveLogo} alt="Thryve logo" />
+        <div className={`scan-badge ${status}`}><Sparkles size={16} /> {statusLabel(status)}</div>
+      </div>
+      <form className="simple-form" onSubmit={submit}>
+        <label>
+          <span>Meal</span>
+          <textarea
+            value={mealText}
+            placeholder="grilled salmon with broccoli and rice"
+            onChange={(event) => setMealText(event.target.value)}
+          />
+        </label>
+        <button className="primary-button" disabled={status === "loading"}>
+          {status === "loading" ? "Estimating..." : "Review meal"}
+        </button>
+      </form>
+      <StatusLine status={status} text={message} />
+    </section>
+  );
+}
+
 function EditMealScreen({
   meal,
   mealLogs,
@@ -701,11 +777,13 @@ function EditMealScreen({
 function WhatIAteScreen({
   mealLogs,
   onScan,
+  onType,
   onEdit,
   onDelete
 }: {
   mealLogs: MealLog[];
   onScan: () => void;
+  onType: () => void;
   onEdit: (meal: MealLog) => void;
   onDelete: (id: string) => Promise<void> | void;
 }) {
@@ -739,6 +817,10 @@ function WhatIAteScreen({
       <button className="scan-cta compact" onClick={onScan}>
         <Camera size={20} />
         <span>Scan a meal</span>
+      </button>
+      <button className="secondary-button full type-meal-button" onClick={onType}>
+        <MessageCircle size={20} />
+        <span>Type in a meal</span>
       </button>
       {earlierMeals.length > 0 && (
         <>
@@ -1566,11 +1648,11 @@ function resizeImage(file: File, maxDimension: number, quality: number) {
 function makeIngredient(): FoodItem {
   return {
     id: crypto.randomUUID(),
-    name: "New ingredient",
+    name: "Ingredient",
     quantity: 1,
-    unit: "item",
-    calories: 50,
-    confidence: 0
+    unit: "serving",
+    calories: 250,
+    confidence: 0.25
   };
 }
 
@@ -1578,7 +1660,7 @@ function makeManualMeal(): MealGuess {
   const items = [makeIngredient()];
   return {
     id: crypto.randomUUID(),
-    photoUrl: samplePhoto,
+    photoUrl: thryveLogo,
     title: "Manual meal",
     items,
     calories: estimateMealCalories(items, 0),

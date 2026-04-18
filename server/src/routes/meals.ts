@@ -3,7 +3,7 @@ import multer from "multer";
 import type { MealGuess, MealLog } from "../../../shared/types.js";
 import { findUserById, persistUserChange } from "../data/store.js";
 import { estimateMealCalories } from "../services/calories.js";
-import { guessFoodFromImage } from "../services/aiFood.js";
+import { guessFoodFromImage, guessFoodFromText } from "../services/aiFood.js";
 
 export const mealRouter = Router();
 const upload = multer({
@@ -51,6 +51,23 @@ mealRouter.post("/guess", (request, response, next) => {
 
 mealRouter.get("/", (_request, response) => {
   findUserById(_request.userId!).then((user) => response.json(user?.meals ?? []));
+});
+
+mealRouter.post("/guess-text", async (request, response) => {
+  try {
+    const text = typeof request.body?.text === "string" ? request.body.text.trim() : "";
+
+    if (text.length < 2) {
+      response.status(400).json({ message: "Type a meal first." });
+      return;
+    }
+
+    const guess = await guessFoodFromText({ text });
+    response.json(guess);
+  } catch (error) {
+    console.error("[food-ai] typed meal analysis failed", error);
+    response.status(500).json({ message: "Meal estimate failed. Try a simpler description or enter manually." });
+  }
 });
 
 mealRouter.get("/:id", async (request, response) => {

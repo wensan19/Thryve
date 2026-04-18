@@ -21,9 +21,10 @@ Thryve is a website-first food tracking prototype designed to prove the core pro
 - Structured editable meal analysis with a main food name plus ingredient rows.
 - Users can add, remove, and correct ingredients, quantities, units, and calories per unit before saving.
 - Manual food corrections update nutrition when Thryve recognizes the corrected food or ingredient name.
-- The Ate page is the main daily meal-tracking surface, with the only scan entry point at the bottom of today's meals.
+- Edited main food and ingredient names trigger live calorie recalculation, with conservative editable fallbacks for unknown foods.
+- The Ate page is the main daily meal-tracking surface, with scan and typed-meal entry points below today's meals.
 - Selecting or taking a food photo starts mock AI analysis automatically, then opens the editable review flow.
-- Users can also start manual meal entry without uploading a photo.
+- Users can also type in a meal without uploading a photo, then review an AI/local estimate in the same editable flow.
 - The dashboard stays lightweight and no longer includes the scan CTA or percentage ring.
 - The review meal screen shows today's total calories and remaining calories before saving.
 - Sweetness, spiciness, and saltiness use 0-100% scales.
@@ -137,7 +138,7 @@ To confirm which provider is active, watch the backend console:
 - Gemini failure fallback: `[food-ai] provider=gemini status=failed fallback=mock`
 - Mock result: `[food-ai] provider=mock status=complete ... matched="..." fallback=true|false`
 
-The Gemini provider uses the uploaded image content and requests structured JSON that maps to the existing review fields: main food, ingredients, quantity, unit, calories per unit, estimated calories, confidence, and flavor sliders. The prompt tells Gemini to separate the main dish from visible ingredients, handle mixed meals, rice/noodle dishes, drinks, desserts, and snacks, and return low confidence instead of forcing a common-food guess when the image is unclear. The provider can later be replaced by another vision service as long as it returns the same `MealGuess` shape.
+The Gemini provider uses the uploaded image content and requests structured JSON that maps to the existing review fields: main food, ingredients, quantity, unit, calories per unit, estimated calories, confidence, and flavor sliders. The prompt tells Gemini to separate the main dish from visible ingredients, handle mixed meals, rice/noodle dishes, drinks, desserts, and snacks, and return low confidence instead of forcing a common-food guess when the image is unclear. Typed meal entry uses the same provider switch: Gemini estimates structure and calories from text when configured, otherwise Thryve falls back to local templates and the shared nutrition lookup. The provider can later be replaced by another vision service as long as it returns the same `MealGuess` shape.
 
 OpenAI variables such as `OPENAI_API_KEY` and `OPENAI_FOOD_MODEL` are no longer used by the active food vision path.
 
@@ -159,7 +160,9 @@ The Exercise page supports weighted workout logging with weight used, kg/lb unit
 
 ## Food Correction And Upload Limits
 
-The meal editor keeps AI output fully editable. When a user renames the main food or an ingredient, Thryve checks a shared nutrition lookup and updates calories, units, and calorie-per-unit values when it recognizes the corrected food. Unknown foods keep the user's current calorie value so the meal can still be saved and adjusted manually.
+The meal editor keeps AI output fully editable. When a user renames the main food or an ingredient, Thryve checks a shared nutrition lookup and updates calories, units, and calorie-per-unit values when it recognizes the corrected food. Unknown foods reset to a conservative editable fallback instead of keeping stale calories from the previous AI guess, so changing "ice cream" to "grilled chicken" or "carrot" no longer carries over dessert assumptions.
+
+Typed meal entry is available from the Ate page below "Scan a meal." Users can enter examples such as "chicken rice", "2 eggs and toast", "bubble tea with pearls", or "grilled salmon with broccoli and rice." The backend returns the same editable `MealGuess` shape as image scanning, with a main food, ingredients, practical units, confidence, and calories. Manual and typed meal flows use the Thryve logo at `/logo.jpeg` instead of a random food image.
 
 Meal image uploads are limited to 8 MB on both frontend and backend. The frontend attempts to normalize HEIC/HEIF, unknown image types, and images larger than roughly 1.5 MB through the browser canvas before sending them to the backend. This usually converts iPhone camera uploads into oriented JPEGs while preserving enough quality for analysis. The backend logs both the original client file metadata and the uploaded payload metadata, then sends Gemini either the upload or the normalized preview payload. If the browser cannot decode a HEIC/HEIF image for normalization, the original image is still sent when accepted by the upload filter, and the backend logs `normalized=false`.
 

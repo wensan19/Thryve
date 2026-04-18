@@ -30,9 +30,16 @@ export function lookupFoodNutrition(foodName: string): FoodNutritionMatch | unde
 }
 
 export function applyFoodNutritionToItem(item: FoodItem, foodName: string): FoodItem {
+  const trimmedName = foodName.trim();
   const match = lookupFoodNutrition(foodName);
   if (!match) {
-    return { ...item, name: foodName };
+    return {
+      ...item,
+      name: foodName,
+      unit: trimmedName ? "serving" : item.unit,
+      calories: trimmedName ? 250 : item.calories,
+      confidence: trimmedName ? Math.min(item.confidence, 0.28) : item.confidence
+    };
   }
 
   return {
@@ -49,19 +56,27 @@ export function applyMainFoodCorrection<T extends { title: string; items: FoodIt
   title: string
 ): T {
   const match = lookupFoodNutrition(title);
-  const items = match
-    ? [
-        {
+  const trimmedTitle = title.trim();
+  const primaryItem = match
+    ? {
+        id: meal.items[0]?.id ?? crypto.randomUUID(),
+        name: match.name,
+        quantity: meal.items[0]?.quantity && meal.items[0].quantity > 0 ? meal.items[0].quantity : 1,
+        unit: match.unit,
+        calories: match.calories,
+        confidence: Math.max(meal.items[0]?.confidence ?? 0, 0.65)
+      }
+    : trimmedTitle
+      ? {
           id: meal.items[0]?.id ?? crypto.randomUUID(),
-          name: match.name,
+          name: title,
           quantity: meal.items[0]?.quantity && meal.items[0].quantity > 0 ? meal.items[0].quantity : 1,
-          unit: match.unit,
-          calories: match.calories,
-          confidence: Math.max(meal.items[0]?.confidence ?? 0, 0.65)
-        },
-        ...meal.items.slice(1)
-      ]
-    : meal.items;
+          unit: "serving" as const,
+          calories: 350,
+          confidence: Math.min(meal.items[0]?.confidence ?? 0.25, 0.28)
+        }
+      : undefined;
+  const items = primaryItem ? [primaryItem, ...meal.items.slice(1)] : meal.items;
 
   return { ...meal, title, items, calories: estimateMealCalories(items, meal.sweetness) };
 }
@@ -207,8 +222,10 @@ const foodNutritionCatalog: FoodNutritionMatch[] = [
   { name: "Broccoli", unit: "gram", calories: 0.35, terms: ["broccoli"] },
   { name: "Mixed vegetables", unit: "cup", calories: 80, terms: ["vegetables", "mixed vegetables", "veg"] },
   { name: "Chicken breast", unit: "gram", calories: 1.65, terms: ["chicken", "chicken breast", "grilled chicken"] },
+  { name: "Grilled chicken", unit: "gram", calories: 1.65, terms: ["grilled chicken"] },
   { name: "Beef", unit: "gram", calories: 2.5, terms: ["beef", "steak"] },
   { name: "Salmon", unit: "gram", calories: 2.08, terms: ["salmon"] },
+  { name: "Grilled salmon", unit: "gram", calories: 2.08, terms: ["grilled salmon"] },
   { name: "Tofu", unit: "gram", calories: 0.8, terms: ["tofu"] },
   { name: "Noodles", unit: "cup", calories: 220, terms: ["noodle", "noodles", "ramen", "pasta"] },
   { name: "Bread", unit: "slice", calories: 95, terms: ["bread", "toast"] },
@@ -218,6 +235,8 @@ const foodNutritionCatalog: FoodNutritionMatch[] = [
   { name: "Apple", unit: "item", calories: 95, terms: ["apple"] },
   { name: "Banana", unit: "item", calories: 105, terms: ["banana"] },
   { name: "Milk tea", unit: "cup", calories: 230, terms: ["milk tea", "bubble tea", "boba"] },
+  { name: "Tapioca pearls", unit: "serving", calories: 150, terms: ["pearls", "tapioca pearls", "boba pearls"] },
+  { name: "Ice cream", unit: "cup", calories: 270, terms: ["ice cream", "gelato"] },
   { name: "Cake", unit: "slice", calories: 360, terms: ["cake", "cheesecake"] }
 ];
 

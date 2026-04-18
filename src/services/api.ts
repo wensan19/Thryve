@@ -78,6 +78,13 @@ export class ApiClient {
     });
   }
 
+  async guessMealFromText(text: string): Promise<MealGuess> {
+    return this.request<MealGuess>("/api/meals/guess-text", {
+      method: "POST",
+      body: JSON.stringify({ text })
+    });
+  }
+
   async getMeals(): Promise<MealLog[]> {
     return this.request<MealLog[]>("/api/meals");
   }
