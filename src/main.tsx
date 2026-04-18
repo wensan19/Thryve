@@ -401,9 +401,9 @@ function LoginScreen({
   initialMessage?: string;
 }) {
   const [mode, setMode] = useState<"login" | "signup">("signup");
-  const [name, setName] = useState("example");
-  const [email, setEmail] = useState("example@example.com");
-  const [password, setPassword] = useState("example1");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [status, setStatus] = useState<AsyncState>("idle");
   const [message, setMessage] = useState(initialMessage || "Use this test account or create your own.");
 
@@ -441,9 +441,9 @@ function LoginScreen({
           <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Login</button>
           <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>Sign up</button>
         </div>
-        {mode === "signup" && <FormField label="Name" value={name} onChange={setName} />}
-        <FormField label="Email" value={email} onChange={setEmail} type="email" />
-        <FormField label="Password" value={password} onChange={setPassword} type="password" />
+        {mode === "signup" && <FormField label="Name" value={name} onChange={setName} placeholder="example" />}
+        <FormField label="Email" value={email} onChange={setEmail} type="email" placeholder="example@example.com" />
+        <FormField label="Password" value={password} onChange={setPassword} type="password" placeholder="example1" />
         <button className="primary-button" disabled={status === "loading"}>
           {status === "loading" ? "Please wait..." : mode === "signup" ? "Create account" : "Login"}
         </button>
@@ -1384,14 +1384,16 @@ function FormField({
   label,
   value,
   onChange,
-  type = "text"
+  type = "text",
+  placeholder
 }: {
   label: string;
   value: string | number;
   onChange: (value: string) => void;
   type?: string;
+  placeholder?: string;
 }) {
-  return <label><span>{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label><span>{label}</span><input type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function Slider({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
